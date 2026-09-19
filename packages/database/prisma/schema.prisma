@@ -1,0 +1,68 @@
+enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+model Organization {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  users     User[]
+  customers Customer[]
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  organizationId Int
+  role           UserRole @default(STAFF)
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Customer {
+  id             Int          @id @default(autoincrement())
+  name           String
+  email          String
+  phone          String?
+  organizationId Int
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Product {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String?
+  sku            String
+  purchasePrice  Float
+  salePrice      Float
+  stockQuantity  Int      @default(0)
+  minimumStock   Int      @default(0)
+  organizationId Int
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}

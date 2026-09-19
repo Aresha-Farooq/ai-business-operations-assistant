@@ -1,0 +1,10 @@
+{
+  "name": "@business-platform/business",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@business-platform/auth": "0.1.0",
+    "@business-platform/database": "0.1.0"
+  }
+}

@@ -1,26 +1,28 @@
 {
   "name": "business-platform",
+  "type": "module",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.3.4",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "dev": "npm run dev --workspace=web",
+    "build": "npm run build --workspace=web",
+    "start": "npm run start --workspace=web",
+    "lint": "npm run lint --workspace=web",
+    "postinstall": "prisma skills sync || exit 0",
+    "contract:emit": "prisma contract emit"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@prisma/cli-engine": "^0.4.0",
+    "@types/node": "^22.20.3",
+    "prisma": "^8.0.0-rc.15"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "^8.0.0-rc.11",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2"
   }
 }

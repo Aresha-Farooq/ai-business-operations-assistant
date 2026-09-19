@@ -1,0 +1,8 @@
+{
+  "name": "@business-platform/validation",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

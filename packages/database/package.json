@@ -1,0 +1,9 @@
+{
+  "name": "@business-platform/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "prisma": "^8.0.0-rc.15"
+  }
+}
