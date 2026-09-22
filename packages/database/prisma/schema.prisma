@@ -9,7 +9,7 @@ model Organization {
   name      String
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
-
+inventoryMovements InventoryMovement[]
   users     User[]
   customers Customer[]
 }
@@ -57,7 +57,7 @@ model Product {
   stockQuantity  Int      @default(0)
   minimumStock   Int      @default(0)
   organizationId Int
-
+inventoryMovements InventoryMovement[]
   organization Organization @relation(
     fields: [organizationId],
     references: [id]
@@ -66,6 +66,31 @@ model Product {
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
+
+
+model InventoryMovement {
+  id             Int      @id @default(autoincrement())
+  productId      Int
+  organizationId Int
+  quantity       Int
+  type           InventoryMovementType
+  reason         String?
+
+  product      Product      @relation(fields: [productId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  DAMAGE
+}
+
 
 enum OrderStatus {
   PENDING

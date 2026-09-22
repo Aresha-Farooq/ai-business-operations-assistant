@@ -1,4 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
+import { applyStockMovement } from "@business-platform/business/inventory";
 import { getCurrentUser } from "@business-platform/auth/session";
 
 type CreateOrderItemInput = {
@@ -65,7 +66,13 @@ export async function createOrder(input: CreateOrderInput) {
 
   // 8. Fetch products belonging to the user's organization
   const productPlan = db.sql.public.product
-    .select("id", "name", "salePrice", "organizationId")
+   .select(
+  "id",
+  "name",
+  "salePrice",
+  "stockQuantity",
+  "organizationId"
+)
     .where((fields, fns) =>
       fns.and(
         fns.in(fields.id, productIds),
@@ -90,7 +97,11 @@ export async function createOrder(input: CreateOrderInput) {
     if (!product) {
       throw new Error("Product not found.");
     }
-
+if (item.quantity > product.stockQuantity) {
+  throw new Error(
+    `Insufficient stock for product "${product.name}". Available: ${product.stockQuantity}, requested: ${item.quantity}.`
+  );
+}
     return {
       productId: product.id,
       quantity: item.quantity,
@@ -107,6 +118,21 @@ export async function createOrder(input: CreateOrderInput) {
   // Order creation will be added in the next step.
 
   const createdOrder = await db.transaction(async (tx) => {
+
+    for (const item of orderItems) {
+  await applyStockMovement(
+    tx,
+    {
+      productId: item.productId,
+      quantity: item.quantity,
+      type: "SALE",
+      reason: "Order creation",
+    },
+    user.organizationId
+  );
+}
+
+
   const orderPlan = tx.sql.public.order
     .insert([
       {

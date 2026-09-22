@@ -8,6 +8,10 @@
       "model": "Customer",
       "namespace": "public"
     },
+    "inventoryMovement": {
+      "model": "InventoryMovement",
+      "namespace": "public"
+    },
     "order": {
       "model": "Order",
       "namespace": "public"
@@ -33,6 +37,31 @@
     "namespaces": {
       "public": {
         "enum": {
+          "InventoryMovementType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "PURCHASE",
+                "value": "PURCHASE"
+              },
+              {
+                "name": "SALE",
+                "value": "SALE"
+              },
+              {
+                "name": "ADJUSTMENT",
+                "value": "ADJUSTMENT"
+              },
+              {
+                "name": "RETURN",
+                "value": "RETURN"
+              },
+              {
+                "name": "DAMAGE",
+                "value": "DAMAGE"
+              }
+            ]
+          },
           "OrderStatus": {
             "codecId": "pg/text@1",
             "members": [
@@ -169,6 +198,136 @@
               },
               "namespaceId": "public",
               "table": "customer"
+            }
+          },
+          "InventoryMovement": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "organizationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "productId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "quantity": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "InventoryMovementType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "organization": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "organizationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Organization",
+                  "namespace": "public"
+                }
+              },
+              "product": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "productId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Product",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "organizationId": {
+                  "column": "organizationId"
+                },
+                "productId": {
+                  "column": "productId"
+                },
+                "quantity": {
+                  "column": "quantity"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "type": {
+                  "column": "type"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "inventoryMovement"
             }
           },
           "Order": {
@@ -467,6 +626,21 @@
                   "namespace": "public"
                 }
               },
+              "inventoryMovements": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "organizationId"
+                  ]
+                },
+                "to": {
+                  "model": "InventoryMovement",
+                  "namespace": "public"
+                }
+              },
               "users": {
                 "cardinality": "1:N",
                 "on": {
@@ -583,6 +757,21 @@
               }
             },
             "relations": {
+              "inventoryMovements": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "productId"
+                  ]
+                },
+                "to": {
+                  "model": "InventoryMovement",
+                  "namespace": "public"
+                }
+              },
               "organization": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -834,6 +1023,129 @@
                   ],
                   "name": "customer_organizationId_idx_2e17ef41",
                   "prefix": "customer_organizationId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "inventoryMovement": {
+              "checks": [
+                {
+                  "expression": "\"type\" IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'RETURN', 'DAMAGE')",
+                  "name": "inventoryMovement_type_check_cc8d808e",
+                  "prefix": "inventoryMovement_type_check"
+                }
+              ],
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "organizationId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "productId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "quantity": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "InventoryMovementType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "productId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "inventoryMovement"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "product"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "organizationId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "inventoryMovement"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "organization"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "organizationId"
+                  ],
+                  "name": "inventoryMovement_organizationId_idx_2e17ef41",
+                  "prefix": "inventoryMovement_organizationId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "productId"
+                  ],
+                  "name": "inventoryMovement_productId_idx_5858600a",
+                  "prefix": "inventoryMovement_productId_idx",
                   "unique": false
                 }
               ],
@@ -1331,6 +1643,16 @@
             }
           },
           "valueSet": {
+            "InventoryMovementType": {
+              "kind": "valueSet",
+              "values": [
+                "PURCHASE",
+                "SALE",
+                "ADJUSTMENT",
+                "RETURN",
+                "DAMAGE"
+              ]
+            },
             "OrderStatus": {
               "kind": "valueSet",
               "values": [
@@ -1354,10 +1676,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "1170d568ffbb0f36c009955d2e25356b2f6268a373d25e5ec64e1106b40287fa"
+    "storageHash": "4b0f14ac193ad5e2016dde1ba9f1ac7a8f0c02e4a50f5ea540876099695a4c3d"
   },
   "execution": {
-    "executionHash": "2bb5dda89716895ed3b5d0e976d2c9b0104c9f083f1853da9504c169c5b7c6c0",
+    "executionHash": "863107dcc9ee3ae2bd698ee0fb4ffc891bcb7b97a1d67d659d4619a3a5a2432f",
     "mutations": {
       "defaults": [
         {
@@ -1373,6 +1695,21 @@
             "column": "updatedAt",
             "namespace": "public",
             "table": "customer"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "inventoryMovement"
           }
         },
         {
