@@ -66,3 +66,53 @@ model Product {
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  customerId     Int
+  organizationId Int
+  status         OrderStatus @default(PENDING)
+  totalAmount    Float
+
+  customer       Customer    @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  organization   Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  items          OrderItem[]
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  unitPrice Float
+
+  order     Order   @relation(
+    fields: [orderId],
+    references: [id]
+  )
+
+  product   Product @relation(
+    fields: [productId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
