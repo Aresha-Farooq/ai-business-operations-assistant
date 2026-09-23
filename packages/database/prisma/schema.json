@@ -111,6 +111,13 @@
                   "kind": "scalar"
                 }
               },
+              "deletedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
               "email": {
                 "nullable": false,
                 "type": {
@@ -122,6 +129,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
                   "kind": "scalar"
                 }
               },
@@ -177,11 +191,17 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "deletedAt": {
+                  "column": "deletedAt"
+                },
                 "email": {
                   "column": "email"
                 },
                 "id": {
                   "column": "id"
+                },
+                "isActive": {
+                  "column": "isActive"
                 },
                 "name": {
                   "column": "name"
@@ -685,6 +705,13 @@
                   "kind": "scalar"
                 }
               },
+              "deletedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
               "description": {
                 "nullable": true,
                 "type": {
@@ -696,6 +723,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
                   "kind": "scalar"
                 }
               },
@@ -757,21 +791,6 @@
               }
             },
             "relations": {
-              "inventoryMovements": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "productId"
-                  ]
-                },
-                "to": {
-                  "model": "InventoryMovement",
-                  "namespace": "public"
-                }
-              },
               "organization": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -794,11 +813,17 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "deletedAt": {
+                  "column": "deletedAt"
+                },
                 "description": {
                   "column": "description"
                 },
                 "id": {
                   "column": "id"
+                },
+                "isActive": {
+                  "column": "isActive"
                 },
                 "minimumStock": {
                   "column": "minimumStock"
@@ -963,6 +988,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "deletedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "email": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -975,6 +1005,15 @@
                     "kind": "function"
                   },
                   "nativeType": "int4",
+                  "nullable": false
+                },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
                   "nullable": false
                 },
                 "name": {
@@ -1434,6 +1473,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "deletedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -1446,6 +1490,15 @@
                     "kind": "function"
                   },
                   "nativeType": "int4",
+                  "nullable": false
+                },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
                   "nullable": false
                 },
                 "minimumStock": {
@@ -1676,7 +1729,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "4b0f14ac193ad5e2016dde1ba9f1ac7a8f0c02e4a50f5ea540876099695a4c3d"
+    "storageHash": "0ea6c32d5a9ddc5f1088a2d91e4c530a35293f340728dfe04045ddb7f7052d5e"
   },
   "execution": {
     "executionHash": "863107dcc9ee3ae2bd698ee0fb4ffc891bcb7b97a1d67d659d4619a3a5a2432f",

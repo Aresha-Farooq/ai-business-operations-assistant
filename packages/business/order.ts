@@ -1,6 +1,6 @@
 import { db, getDbRuntime } from "@business-platform/database";
 import { applyStockMovement } from "@business-platform/business/inventory";
-import { getCurrentUser } from "@business-platform/auth/session";
+import { requireCurrentUser } from "@business-platform/auth/session";
 
 type CreateOrderItemInput = {
   productId: number;
@@ -14,11 +14,7 @@ type CreateOrderInput = {
 
 export async function createOrder(input: CreateOrderInput) {
   // 1. Get authenticated user
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
+  const user = await requireCurrentUser();
 
   // 2. Get database runtime
   const runtime = await getDbRuntime();
@@ -45,12 +41,14 @@ export async function createOrder(input: CreateOrderInput) {
   }
 
   // 6. Verify that the customer belongs to the user's organization
+  //    and is still active
   const customerPlan = db.sql.public.customer
     .select("id", "name", "organizationId")
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.id, input.customerId),
-        fns.eq(fields.organizationId, user.organizationId)
+        fns.eq(fields.organizationId, user.organizationId),
+        fns.eq(fields.isActive, true)
       )
     )
     .build();
@@ -64,19 +62,21 @@ export async function createOrder(input: CreateOrderInput) {
   // 7. Get product IDs from the request
   const productIds = input.items.map((item) => item.productId);
 
-  // 8. Fetch products belonging to the user's organization
+  // 8. Fetch active products belonging to the user's organization
   const productPlan = db.sql.public.product
-   .select(
-  "id",
-  "name",
-  "salePrice",
-  "stockQuantity",
-  "organizationId"
-)
+    .select(
+      "id",
+      "name",
+      "salePrice",
+      "stockQuantity",
+      "organizationId",
+      "isActive"
+    )
     .where((fields, fns) =>
       fns.and(
         fns.in(fields.id, productIds),
-        fns.eq(fields.organizationId, user.organizationId)
+        fns.eq(fields.organizationId, user.organizationId),
+        fns.eq(fields.isActive, true)
       )
     )
     .build();
@@ -97,11 +97,14 @@ export async function createOrder(input: CreateOrderInput) {
     if (!product) {
       throw new Error("Product not found.");
     }
-if (item.quantity > product.stockQuantity) {
-  throw new Error(
-    `Insufficient stock for product "${product.name}". Available: ${product.stockQuantity}, requested: ${item.quantity}.`
-  );
-}
+
+    // Check stock availability
+    if (item.quantity > product.stockQuantity) {
+      throw new Error(
+        `Insufficient stock for product "${product.name}". Available: ${product.stockQuantity}, requested: ${item.quantity}.`
+      );
+    }
+
     return {
       productId: product.id,
       quantity: item.quantity,
@@ -115,78 +118,80 @@ if (item.quantity > product.stockQuantity) {
     0
   );
 
-  // Order creation will be added in the next step.
-
+  // 12. Create order + inventory movements + order items
+  //     inside one transaction
   const createdOrder = await db.transaction(async (tx) => {
-
+    // 12a. Decrease inventory for every ordered product
     for (const item of orderItems) {
-  await applyStockMovement(
-    tx,
-    {
-      productId: item.productId,
-      quantity: item.quantity,
-      type: "SALE",
-      reason: "Order creation",
-    },
-    user.organizationId
-  );
-}
+      await applyStockMovement(
+        tx,
+        {
+          productId: item.productId,
+          quantity: item.quantity,
+          type: "SALE",
+          reason: "Order creation",
+        },
+        user.organizationId
+      );
+    }
 
+    // 12b. Create the order
+    const orderPlan = tx.sql.public.order
+      .insert([
+        {
+          customerId: input.customerId,
+          organizationId: user.organizationId,
+          status: "PENDING",
+          totalAmount,
+        },
+      ])
+      .returning(
+        "id",
+        "customerId",
+        "organizationId",
+        "status",
+        "totalAmount"
+      )
+      .build();
 
-  const orderPlan = tx.sql.public.order
-    .insert([
-      {
-        customerId: input.customerId,
-        organizationId: user.organizationId,
-        status: "PENDING",
-        totalAmount,
-      },
-    ])
-    .returning(
-      "id",
-      "customerId",
-      "organizationId",
-      "status",
-      "totalAmount"
-    )
-    .build();
+    const orders = await tx.query(orderPlan);
 
-  const orders = await tx.query(orderPlan);
+    const order = orders[0];
 
-  const order = orders[0];
+    if (!order) {
+      throw new Error("Failed to create order.");
+    }
 
-  if (!order) {
-    throw new Error("Failed to create order.");
-  }
+    // 12c. Create order items
+    const orderItemPlan = tx.sql.public.orderItem
+      .insert(
+        orderItems.map((item) => ({
+          orderId: order.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        }))
+      )
+      .returning(
+        "id",
+        "orderId",
+        "productId",
+        "quantity",
+        "unitPrice"
+      )
+      .build();
 
-  const orderItemPlan = tx.sql.public.orderItem
-    .insert(
-      orderItems.map((item) => ({
-        orderId: order.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-      }))
-    )
-    .returning(
-      "id",
-      "orderId",
-      "productId",
-      "quantity",
-      "unitPrice"
-    )
-    .build();
+    const createdOrderItems = await tx.query(orderItemPlan);
 
-  const createdOrderItems = await tx.query(orderItemPlan);
+    return {
+      id: order.id,
+      customerId: order.customerId,
+      organizationId: order.organizationId,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      items: createdOrderItems,
+    };
+  });
 
-  return {
-    id: order.id,
-    customerId: order.customerId,
-    organizationId: order.organizationId,
-    status: order.status,
-    totalAmount: order.totalAmount,
-    items: createdOrderItems,
-  };
-});
-return createdOrder;
+  return createdOrder;
 }

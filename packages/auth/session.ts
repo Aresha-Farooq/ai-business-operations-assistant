@@ -15,3 +15,12 @@ export async function getCurrentUser() {
     return null;
   }
 }
+export async function requireCurrentUser() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  return user;
+}

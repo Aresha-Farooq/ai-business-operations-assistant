@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'0ea6c32d5a9ddc5f1088a2d91e4c530a35293f340728dfe04045ddb7f7052d5e'>;
+  StorageHashBase<'65b38b15615fe281e2ec0ac4b16bade662b43b2ba9024499dfeb58480fd0214f'>;
 export type ExecutionHash =
   ExecutionHashBase<'863107dcc9ee3ae2bd698ee0fb4ffc891bcb7b97a1d67d659d4619a3a5a2432f'>;
 export type ProfileHash =
@@ -297,8 +297,6 @@ export type FieldOutputTypes = {
       readonly stockQuantity: CodecTypes['pg/int4@1']['output'];
       readonly minimumStock: CodecTypes['pg/int4@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
-      readonly isActive: CodecTypes['pg/bool@1']['output'];
-      readonly deletedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
@@ -371,8 +369,6 @@ export type FieldInputTypes = {
       readonly stockQuantity: CodecTypes['pg/int4@1']['input'];
       readonly minimumStock: CodecTypes['pg/int4@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
-      readonly isActive: CodecTypes['pg/bool@1']['input'];
-      readonly deletedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
@@ -437,10 +433,8 @@ export type StorageColumnTypes = {
     };
     readonly product: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
-      readonly deletedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly description: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
-      readonly isActive: CodecTypes['pg/bool@1']['output'];
       readonly minimumStock: CodecTypes['pg/int4@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
@@ -511,10 +505,8 @@ export type StorageColumnInputTypes = {
     };
     readonly product: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
-      readonly deletedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly description: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
-      readonly isActive: CodecTypes['pg/bool@1']['input'];
       readonly minimumStock: CodecTypes['pg/int4@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
@@ -583,12 +575,11 @@ export namespace Models {
     stockQuantity: CodecTypes['pg/int4@1']['output'];
     minimumStock: CodecTypes['pg/int4@1']['output'];
     organizationId: CodecTypes['pg/int4@1']['output'];
-    isActive: CodecTypes['pg/bool@1']['output'];
-    deletedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    inventoryMovements: public_InventoryMovement[];
     organization: public_Organization;
-    readonly [RelationKeys]?: 'organization';
+    readonly [RelationKeys]?: 'inventoryMovements' | 'organization';
   };
   export type public_InventoryMovement = {
     id: CodecTypes['pg/int4@1']['output'];
@@ -1100,20 +1091,6 @@ type ContractBase = Omit<
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
-                };
-                readonly isActive: {
-                  readonly nativeType: 'bool';
-                  readonly codecId: 'pg/bool@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'literal';
-                    readonly value: DefaultLiteralValue<'pg/bool@1', true>;
-                  };
-                };
-                readonly deletedAt: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz-string@1';
-                  readonly nullable: true;
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -1703,17 +1680,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
-              readonly isActive: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
-              };
-              readonly deletedAt: {
-                readonly nullable: true;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'pg/timestamptz-string@1';
-                };
-              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -1730,6 +1696,17 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly inventoryMovements: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'InventoryMovement';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['productId'];
+                };
+              };
               readonly organization: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -1756,8 +1733,6 @@ type ContractBase = Omit<
                 readonly stockQuantity: { readonly column: 'stockQuantity' };
                 readonly minimumStock: { readonly column: 'minimumStock' };
                 readonly organizationId: { readonly column: 'organizationId' };
-                readonly isActive: { readonly column: 'isActive' };
-                readonly deletedAt: { readonly column: 'deletedAt' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };

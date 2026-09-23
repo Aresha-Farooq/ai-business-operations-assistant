@@ -3,7 +3,11 @@ import { ZodError } from "zod";
 import { getOrders } from "@business-platform/business/order-query";
 import { createOrder } from "@business-platform/business/order";
 import { createOrderSchema } from "@business-platform/validation/order";
-
+import {
+  getCustomerById,
+  updateCustomer,
+  deleteCustomer,
+} from "@business-platform/business/customer";
 export async function POST(request: Request) {
   try {
     const body = await request.json();

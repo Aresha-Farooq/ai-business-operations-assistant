@@ -32,11 +32,13 @@ model User {
 }
 
 model Customer {
-  id             Int          @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
   name           String
   email          String
   phone          String?
   organizationId Int
+  isActive       Boolean            @default(true)
+  deletedAt      TimestamptzString?
 
   organization Organization @relation(
     fields: [organizationId],
@@ -56,15 +58,16 @@ model Product {
   salePrice      Float
   stockQuantity  Int      @default(0)
   minimumStock   Int      @default(0)
-  organizationId Int
-inventoryMovements InventoryMovement[]
-  organization Organization @relation(
-    fields: [organizationId],
-    references: [id]
-  )
 
-  createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
+  organizationId Int
+
+  isActive       Boolean  @default(true)
+  deletedAt      TimestamptzString?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
 }
 
 

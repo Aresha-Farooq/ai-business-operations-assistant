@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCustomers , createCustomer} from "@business-platform/business/customer";
 import { createCustomerSchema } from "@business-platform/validation/customer";
 import { ZodError } from "zod";
+import { getCustomerById } from "@business-platform/business/customer";
 export async function GET() {
   try {
     const customers = await getCustomers();

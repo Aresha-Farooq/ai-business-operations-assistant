@@ -34,4 +34,28 @@ export const createProductSchema = z
     }
   );
 
+  export const updateProductSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters.").optional(),
+
+  description: z.string().optional(),
+
+  sku: z.string().min(1, "SKU is required.").optional(),
+
+  purchasePrice: z.number().nonnegative().optional(),
+
+  salePrice: z.number().nonnegative().optional(),
+
+  minimumStock: z.number().int().nonnegative().optional(),
+}).refine(
+  (data) =>
+    data.purchasePrice === undefined ||
+    data.salePrice === undefined ||
+    data.salePrice >= data.purchasePrice,
+  {
+    message: "Sale price cannot be less than purchase price.",
+    path: ["salePrice"],
+  }
+);
+
 export type CreateProductInput = z.infer<typeof createProductSchema>;
+export type UpdateProductInput = z.infer<typeof updateProductSchema>;
