@@ -16,6 +16,7 @@ export const changeStockSchema = z.object({
   ]),
 
   reason: z.string().max(500).optional(),
+  adjustmentDirection: z.enum(["INCREASE", "DECREASE"]).optional()
 });
 
 export type ChangeStockInput = z.infer<typeof changeStockSchema>;

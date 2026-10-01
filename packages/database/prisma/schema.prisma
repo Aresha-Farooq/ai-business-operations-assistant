@@ -12,6 +12,7 @@ model Organization {
 inventoryMovements InventoryMovement[]
   users     User[]
   customers Customer[]
+  payments Payment[]
 }
 
 model User {
@@ -101,6 +102,19 @@ enum OrderStatus {
   CANCELLED
   COMPLETED
 }
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  CARD
+  JAZZCASH
+  EASYPAISA
+}
 
 model Order {
   id             Int         @id @default(autoincrement())
@@ -108,7 +122,7 @@ model Order {
   organizationId Int
   status         OrderStatus @default(PENDING)
   totalAmount    Float
-
+payments Payment[]
   customer       Customer    @relation(
     fields: [customerId],
     references: [id]
@@ -144,3 +158,32 @@ model OrderItem {
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
+
+model Payment {
+  id                   Int           @id @default(autoincrement())
+  orderId              Int
+  organizationId       Int
+  amount               Float
+  currency             String
+  method               PaymentMethod
+  status               PaymentStatus @default(PENDING)
+  gateway              String?
+  gatewayTransactionId String?
+
+  order Order @relation(
+    fields: [orderId],
+    references: [id]
+  )
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+
+
+

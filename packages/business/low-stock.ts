@@ -1,15 +1,9 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { getCurrentUser } from "@business-platform/auth/session";
+import { requireCurrentUser } from "@business-platform/auth/session";
 
 export async function getLowStockProducts() {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
-
+const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
-
   const productsPlan = db.sql.public.product
     .select(
       "id",
@@ -26,8 +20,6 @@ export async function getLowStockProducts() {
       )
     )
     .build();
-
   const products = await runtime.query(productsPlan);
-
   return products;
 }

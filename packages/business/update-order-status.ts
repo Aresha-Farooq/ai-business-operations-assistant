@@ -1,18 +1,14 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { getCurrentUser } from "@business-platform/auth/session";
+import { requireCurrentUser } from "@business-platform/auth/session";
 import { applyStockMovement } from "@business-platform/business/inventory";
 type UpdateOrderStatusInput = {
   orderId: number;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 };
 
+
 export async function updateOrderStatus(input: UpdateOrderStatusInput) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
-
+const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
 
   const orderPlan = db.sql.public.order
@@ -34,20 +30,20 @@ export async function updateOrderStatus(input: UpdateOrderStatusInput) {
   }
 
   const allowedTransitions: Record<
-    typeof existingOrder.status,
-    string[]
-  > = {
-    PENDING: ["CONFIRMED", "CANCELLED"],
-    CONFIRMED: ["COMPLETED", "CANCELLED"],
-    CANCELLED: [],
-    COMPLETED: [],
-  };
+  typeof existingOrder.status,
+  typeof existingOrder.status[]
+> = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["COMPLETED", "CANCELLED"],
+  CANCELLED: [],
+  COMPLETED: [],
+};
 
   if (!allowedTransitions[existingOrder.status].includes(input.status)) {
-    throw new Error(
-      `Cannot change order status from ${existingOrder.status} to ${input.status}.`
-    );
-  }
+  throw new Error(
+    `Cannot change order status from ${existingOrder.status} to ${input.status}.`
+  );
+}
 
   const result = await db.transaction(async (tx) => {
     // If the order is being cancelled,
@@ -85,7 +81,6 @@ export async function updateOrderStatus(input: UpdateOrderStatusInput) {
   );
 }
     }
-
     const updatePlan = tx.sql.public.order
       .update({
         status: input.status,
