@@ -78,6 +78,10 @@
                 "value": "CONFIRMED"
               },
               {
+                "name": "PROCESSING",
+                "value": "PROCESSING"
+              },
+              {
                 "name": "CANCELLED",
                 "value": "CANCELLED"
               },
@@ -126,6 +130,23 @@
               {
                 "name": "REFUNDED",
                 "value": "REFUNDED"
+              }
+            ]
+          },
+          "ShippingStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "NOT_SHIPPED",
+                "value": "NOT_SHIPPED"
+              },
+              {
+                "name": "SHIPPED",
+                "value": "SHIPPED"
+              },
+              {
+                "name": "DELIVERED",
+                "value": "DELIVERED"
               }
             ]
           },
@@ -426,6 +447,19 @@
                   "kind": "scalar"
                 }
               },
+              "shippingStatus": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ShippingStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
               "status": {
                 "nullable": false,
                 "type": {
@@ -531,6 +565,9 @@
                 },
                 "organizationId": {
                   "column": "organizationId"
+                },
+                "shippingStatus": {
+                  "column": "shippingStatus"
                 },
                 "status": {
                   "column": "status"
@@ -683,6 +720,13 @@
                   "kind": "scalar"
                 }
               },
+              "slug": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -763,6 +807,9 @@
                 },
                 "name": {
                   "column": "name"
+                },
+                "slug": {
+                  "column": "slug"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -1440,8 +1487,13 @@
             "order": {
               "checks": [
                 {
-                  "expression": "\"status\" IN ('PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED')",
-                  "name": "order_status_check_5ff53205",
+                  "expression": "\"shippingStatus\" IN ('NOT_SHIPPED', 'SHIPPED', 'DELIVERED')",
+                  "name": "order_shippingStatus_check_be2a8ed8",
+                  "prefix": "order_shippingStatus_check"
+                },
+                {
+                  "expression": "\"status\" IN ('PENDING', 'CONFIRMED', 'PROCESSING', 'CANCELLED', 'COMPLETED')",
+                  "name": "order_status_check_d4c97ae4",
                   "prefix": "order_status_check"
                 }
               ],
@@ -1473,6 +1525,21 @@
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
                   "nullable": false
+                },
+                "shippingStatus": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "NOT_SHIPPED"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ShippingStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -1689,6 +1756,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "slug": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "nativeType": "timestamptz",
@@ -1702,7 +1774,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                }
+              ]
             },
             "payment": {
               "checks": [
@@ -2106,6 +2184,7 @@
               "values": [
                 "PENDING",
                 "CONFIRMED",
+                "PROCESSING",
                 "CANCELLED",
                 "COMPLETED"
               ]
@@ -2128,6 +2207,14 @@
                 "REFUNDED"
               ]
             },
+            "ShippingStatus": {
+              "kind": "valueSet",
+              "values": [
+                "NOT_SHIPPED",
+                "SHIPPED",
+                "DELIVERED"
+              ]
+            },
             "UserRole": {
               "kind": "valueSet",
               "values": [
@@ -2142,7 +2229,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6bb7f44bfe47435c49079a9b9591ba2602f941e23449631affcdb35db313cdfc"
+    "storageHash": "48a96eccffb878a37cbab2d1bee54d2cfd1fd181be8517f8022f5cfed4591e11"
   },
   "execution": {
     "executionHash": "b69ed035b22dc7fca31fd4379c995ad246926d6ec4176b38f3b3c7636748378f",

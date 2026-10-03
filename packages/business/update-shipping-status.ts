@@ -1,22 +1,21 @@
 import { db, getDbRuntime } from "@business-platform/database";
 import { requireCurrentUser } from "@business-platform/auth/session";
 import {
-  canTransitionOrderStatus,
-  type OrderStatus,
+  canTransitionShippingStatus,
+  type ShippingStatus,
 } from "./order-status";
 
-type UpdateOrderStatusInput = {
+type UpdateShippingStatusInput = {
   orderId: number;
-  status: OrderStatus;
+  shippingStatus: ShippingStatus;
 };
 
-export async function updateOrderStatus(
-  input: UpdateOrderStatusInput
+export async function updateShippingStatus(
+  input: UpdateShippingStatusInput
 ) {
   const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
 
-  // Find the order inside the user's organization
   const orderPlan = db.sql.public.order
     .select(
       "id",
@@ -40,19 +39,23 @@ export async function updateOrderStatus(
     throw new Error("Order not found.");
   }
 
-  const currentStatus = order.status as OrderStatus;
+  const currentShippingStatus =
+    order.shippingStatus as ShippingStatus;
 
-  // Prevent invalid status transitions
-  if (!canTransitionOrderStatus(currentStatus, input.status)) {
+  if (
+    !canTransitionShippingStatus(
+      currentShippingStatus,
+      input.shippingStatus
+    )
+  ) {
     throw new Error(
-      `Cannot change order status from ${currentStatus} to ${input.status}.`
+      `Cannot change shipping status from ${currentShippingStatus} to ${input.shippingStatus}.`
     );
   }
 
-  // Update the order
   const updatePlan = db.sql.public.order
     .update({
-      status: input.status,
+      shippingStatus: input.shippingStatus,
     })
     .where((fields, fns) =>
       fns.and(
@@ -73,7 +76,7 @@ export async function updateOrderStatus(
   const updatedOrder = updatedOrders[0];
 
   if (!updatedOrder) {
-    throw new Error("Failed to update order status.");
+    throw new Error("Failed to update shipping status.");
   }
 
   return updatedOrder;

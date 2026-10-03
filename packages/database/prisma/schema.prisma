@@ -7,12 +7,15 @@ enum UserRole {
 model Organization {
   id        Int      @id @default(autoincrement())
   name      String
+slug String? @unique
+
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
-inventoryMovements InventoryMovement[]
-  users     User[]
-  customers Customer[]
-  payments Payment[]
+
+  inventoryMovements InventoryMovement[]
+  users             User[]
+  customers         Customer[]
+  payments          Payment[]
 }
 
 model User {
@@ -99,8 +102,15 @@ enum InventoryMovementType {
 enum OrderStatus {
   PENDING
   CONFIRMED
+  PROCESSING
   CANCELLED
   COMPLETED
+}
+
+enum ShippingStatus {
+  NOT_SHIPPED
+  SHIPPED
+  DELIVERED
 }
 enum PaymentStatus {
   PENDING
@@ -121,6 +131,7 @@ model Order {
   customerId     Int
   organizationId Int
   status         OrderStatus @default(PENDING)
+  shippingStatus ShippingStatus @default(NOT_SHIPPED)
   totalAmount    Float
 payments Payment[]
   customer       Customer    @relation(
