@@ -4,6 +4,27 @@ enum UserRole {
   STAFF
 }
 
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum DocumentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+
 model Organization {
   id        Int      @id @default(autoincrement())
   name      String
@@ -11,7 +32,8 @@ slug String? @unique
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
-
+  tickets Ticket[]
+documents Document[]
   inventoryMovements InventoryMovement[]
   users             User[]
   customers         Customer[]
@@ -43,6 +65,7 @@ model Customer {
   organizationId Int
   isActive       Boolean            @default(true)
   deletedAt      TimestamptzString?
+  tickets Ticket[]
 
   organization Organization @relation(
     fields: [organizationId],
@@ -51,6 +74,29 @@ model Customer {
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
+}
+
+model Ticket {-
+  id             Int            @id @default(autoincrement())
+  organizationId Int
+  customerId     Int
+  subject        String
+  description    String
+  priority       TicketPriority @default(MEDIUM)
+  status         TicketStatus   @default(OPEN)
+  assigneeId     Int?
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  customer Customer @relation(
+    fields: [customerId],
+    references: [id]
+  )
 }
 
 model Product {
@@ -195,6 +241,32 @@ model Payment {
   updatedAt temporal.updatedAtString()
 }
 
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+
+model Document {
+  id             Int            @id @default(autoincrement())
+  organizationId Int
+  name           String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  status         DocumentStatus @default(UPLOADED)
+  approvalStatus DocumentApprovalStatus @default(PENDING)
+
+  
+  uploadedBy     Int?
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
 
 
 

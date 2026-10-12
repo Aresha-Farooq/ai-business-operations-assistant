@@ -48,3 +48,6 @@ dist/
 .claude/
 .cursor/
 .devin/
+
+
+apps/web/.private-storage/

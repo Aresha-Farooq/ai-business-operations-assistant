@@ -1,4 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
+import { applyStockMovement } from "@business-platform/business/inventory";
 import type { CheckoutInput } from "@business-platform/validation/checkout";
 
 export async function createCheckoutOrder(
@@ -114,15 +115,85 @@ const totalAmount = orderItems.reduce(
   0
 );
 
-// 5. Create order + items + inventory
-const createdOrder = await db.transaction(async (tx) => {
-  // ...
-});
+
   // 3. Validate stock
 
   // 4. Calculate total
 
   // 5. Create order + items + inventory movement in transaction
+const createdOrder = await db.transaction(async (tx) => {
+  for (const item of orderItems) {
+    await applyStockMovement(
+      tx,
+      {
+        productId: item.productId,
+        quantity: item.quantity,
+        type: "SALE",
+        reason: "Customer checkout",
+      },
+      organizationId
+    );
+  }
 
+  const orderPlan = tx.sql.public.order
+    .insert([
+      {
+        customerId: customer.id,
+        organizationId,
+        status: "PENDING",
+        shippingStatus: "NOT_SHIPPED",
+        totalAmount,
+      },
+    ])
+    .returning(
+      "id",
+      "customerId",
+      "organizationId",
+      "status",
+      "shippingStatus",
+      "totalAmount"
+    )
+    .build();
+
+  const orders = await tx.query(orderPlan);
+
+  const order = orders[0];
+
+  if (!order) {
+    throw new Error("Failed to create order.");
+  }
+
+  const orderItemPlan = tx.sql.public.orderItem
+    .insert(
+      orderItems.map((item) => ({
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      }))
+    )
+    .returning(
+      "id",
+      "orderId",
+      "productId",
+      "quantity",
+      "unitPrice"
+    )
+    .build();
+
+  const createdOrderItems = await tx.query(orderItemPlan);
+
+  return {
+    id: order.id,
+    customerId: order.customerId,
+    organizationId: order.organizationId,
+    status: order.status,
+    shippingStatus: order.shippingStatus,
+    totalAmount: order.totalAmount,
+    items: createdOrderItems,
+  };
+});
+
+return createdOrder;
   // 6. Return created order
 }

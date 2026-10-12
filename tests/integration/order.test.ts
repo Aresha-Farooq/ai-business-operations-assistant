@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { GET, POST } from "../../apps/web/app/api/orders/route";
 
+
 vi.mock("@business-platform/auth/session", () => ({
   requireCurrentUser: vi.fn(async () => ({
+    userId: 4,
+    organizationId: 1,
+    role: "STAFF",
+  })),
+  getCurrentUser: vi.fn(async () => ({
     userId: 4,
     organizationId: 1,
     role: "STAFF",

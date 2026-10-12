@@ -56,6 +56,7 @@ export async function GET() {
 
     return NextResponse.json(orders, { status: 200 });
   } catch (error) {
+    console.error("GET ORDERS TEST ERROR:", error);
     if (error instanceof Error) {
       if (error.message === "Not authenticated.") {
         return NextResponse.json(
