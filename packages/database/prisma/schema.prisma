@@ -38,6 +38,7 @@ documents Document[]
   users             User[]
   customers         Customer[]
   payments          Payment[]
+  documentChunks DocumentChunk[]
 }
 
 model User {
@@ -76,7 +77,7 @@ model Customer {
   updatedAt temporal.updatedAtString()
 }
 
-model Ticket {-
+model Ticket {
   id             Int            @id @default(autoincrement())
   organizationId Int
   customerId     Int
@@ -266,7 +267,35 @@ model Document {
   updatedAt      temporal.updatedAtString()
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  chunks DocumentChunk[]
 }
 
 
+
+model DocumentChunk {
+  id             Int      @id @default(autoincrement())
+  documentId     Int
+  organizationId Int
+  chunkIndex     Int
+  content        String
+  documentType   String
+  source         String
+  processedAt    TimestamptzString @default(now())
+  createdAt      TimestamptzString @default(now())
+
+  document Document @relation(
+    fields: [documentId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@unique([documentId, chunkIndex])
+  @@index([organizationId, documentId])
+}
 

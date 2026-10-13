@@ -1,5 +1,10 @@
 {
   "name": "@business-platform/rag",
   "version": "0.1.0",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "mammoth": "^1.13.0",
+    "pdf-parse": "^2.4.5",
+    "xlsx": "^0.18.5"
+  }
 }
