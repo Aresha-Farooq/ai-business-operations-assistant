@@ -1,1 +1,1 @@
-export { db, getDbRuntime } from "./prisma/db";
+export { db, getDbRuntime } from "./prisma/db.js";

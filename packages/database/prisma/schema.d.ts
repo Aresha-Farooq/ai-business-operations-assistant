@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'f866c3a0569eb74de1bae7e4323895fab3bfd77473d76f23662404d969847fe7'>;
+  StorageHashBase<'5354bc642249842f46320bc208491a01e77361b8067fdee9e04aada2134757d3'>;
 export type ExecutionHash =
   ExecutionHashBase<'d75c025bfbe350d9bf185294ba933bcf1b372f6631168fa6d7a3f08d5d7ddb7e'>;
 export type ProfileHash =
@@ -276,6 +276,7 @@ export type FieldOutputTypes = {
       readonly source: CodecTypes['pg/text@1']['output'];
       readonly processedAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly embeddingJson: CodecTypes['pg/text@1']['output'] | null;
     };
     readonly InventoryMovement: {
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -401,6 +402,7 @@ export type FieldInputTypes = {
       readonly source: CodecTypes['pg/text@1']['input'];
       readonly processedAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly embeddingJson: CodecTypes['pg/text@1']['input'] | null;
     };
     readonly InventoryMovement: {
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -522,6 +524,7 @@ export type StorageColumnTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly documentId: CodecTypes['pg/int4@1']['output'];
       readonly documentType: CodecTypes['pg/text@1']['output'];
+      readonly embeddingJson: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
       readonly processedAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -647,6 +650,7 @@ export type StorageColumnInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly documentId: CodecTypes['pg/int4@1']['input'];
       readonly documentType: CodecTypes['pg/text@1']['input'];
+      readonly embeddingJson: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
       readonly processedAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -904,6 +908,7 @@ export namespace Models {
     source: CodecTypes['pg/text@1']['output'];
     processedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    embeddingJson: CodecTypes['pg/text@1']['output'] | null;
     document: public_Document;
     organization: public_Organization;
     readonly [RelationKeys]?: 'document' | 'organization';
@@ -1174,6 +1179,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-string@1';
                   readonly nullable: false;
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly embeddingJson: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -2258,6 +2268,10 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-string@1';
                 };
               };
+              readonly embeddingJson: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
             };
             readonly relations: {
               readonly document: {
@@ -2298,6 +2312,7 @@ type ContractBase = Omit<
                 readonly source: { readonly column: 'source' };
                 readonly processedAt: { readonly column: 'processedAt' };
                 readonly createdAt: { readonly column: 'createdAt' };
+                readonly embeddingJson: { readonly column: 'embeddingJson' };
               };
             };
           };

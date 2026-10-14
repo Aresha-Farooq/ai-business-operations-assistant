@@ -1,5 +1,13 @@
+
 {
   "name": "@business-platform/ai",
   "version": "0.1.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.2"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }

@@ -282,7 +282,7 @@ model DocumentChunk {
   source         String
   processedAt    TimestamptzString @default(now())
   createdAt      TimestamptzString @default(now())
-
+  embeddingJson String?
   document Document @relation(
     fields: [documentId],
     references: [id],
