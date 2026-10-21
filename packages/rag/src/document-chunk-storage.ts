@@ -1,60 +1,92 @@
-import { db, getDbRuntime } from "@business-platform/database";
+
 import type { ProcessedChunk } from "./process-document.js";
 import { generateEmbedding } from "@business-platform/ai";
+import { postgresPool } from "./postgres.js";
+
 export async function saveDocumentChunks(
-  chunks: ProcessedChunk[]
+  chunks: ProcessedChunk[],
 ): Promise<void> {
-  if (chunks.length === 0) return;
-
-  const runtime = await getDbRuntime();
-
   for (const chunk of chunks) {
     const embedding = await generateEmbedding(chunk.text);
-    const query = db.sql.public.documentChunk
-      .insert([
-        {
-            
-embeddingJson: JSON.stringify(embedding),
-          documentId: chunk.documentId,
-          organizationId: chunk.organizationId,
-          chunkIndex: chunk.index,
-          content: chunk.text,
-          documentType: chunk.documentType,
-          source: chunk.source,
-          processedAt: chunk.processedAt,
-        },
-      ])
-      .returning("id")
-      .build();
+    const vectorString = `[${embedding.join(",")}]`;
 
-    await runtime.query(query);
+    await postgresPool.query(
+      `INSERT INTO public."documentChunk"
+        (
+          "documentId",
+          "organizationId",
+          "chunkIndex",
+          content,
+          "documentType",
+          source,
+          "processedAt",
+          "embeddingJson",
+          embedding
+        )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)`,
+      [
+        chunk.documentId,
+        chunk.organizationId,
+        chunk.index,
+        chunk.text,
+        chunk.documentType,
+        chunk.source,
+        chunk.processedAt,
+        JSON.stringify(embedding),
+        vectorString,
+      ],
+    );
   }
 }
 
 export async function getDocumentChunks(
   organizationId: number,
-  documentId: number
+  documentId: number,
 ) {
-  const runtime = await getDbRuntime();
+  const result = await postgresPool.query(
+    `SELECT
+       id,
+       "documentId",
+       "organizationId",
+       "chunkIndex",
+       content,
+       "documentType",
+       source,
+       "processedAt"
+     FROM public."documentChunk"
+     WHERE "organizationId" = $1
+       AND "documentId" = $2
+     ORDER BY "chunkIndex" ASC`,
+    [organizationId, documentId],
+  );
 
-  const query = db.sql.public.documentChunk
-    .select(
-      "id",
-      "documentId",
-      "organizationId",
-      "chunkIndex",
-      "content",
-      "documentType",
-      "source",
-      "processedAt"
-    )
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.organizationId, organizationId),
-        fns.eq(fields.documentId, documentId)
-      )
-    )
-    .build();
+  return result.rows;
+}
 
-  return runtime.query(query);
+export async function searchSimilarChunks(
+  organizationId: number,
+  question: string,
+  limit: number = 5,
+) {
+  const queryEmbedding = await generateEmbedding(question);
+  const vectorString = `[${queryEmbedding.join(",")}]`;
+
+  const result = await postgresPool.query(
+    `SELECT
+       id,
+       "documentId",
+       "organizationId",
+       "chunkIndex",
+       content,
+       source,
+       1 - (embedding <=> $1::vector) AS similarity
+     FROM public."documentChunk"
+     WHERE "organizationId" = $2
+       AND embedding IS NOT NULL
+     ORDER BY embedding <=> $1::vector
+     LIMIT $3`,
+    [vectorString, organizationId, limit],
+  );
+
+  return result.rows;
 }

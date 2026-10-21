@@ -1,11 +1,16 @@
+
 {
   "name": "@business-platform/rag",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
     "mammoth": "^1.13.0",
     "pdf-parse": "^2.4.5",
     "xlsx": "^0.18.5",
-    "@business-platform/ai": "0.1.0"
+    "@business-platform/ai": "0.1.0",
+    "pg": "^8.22.0"
   }
 }

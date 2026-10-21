@@ -1,46 +1,25 @@
 
-import { beforeEach, describe, expect, it } from "vitest";
-import { vi } from "vitest";
-
-vi.mock("@business-platform/ai", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue([
-    0.12,
-    -0.38,
-    0.71,
-  ]),
-}));
-const { queryMock, getDbRuntimeMock, buildMock } = vi.hoisted(() => ({
-  queryMock: vi.fn(),
-  getDbRuntimeMock: vi.fn(),
-  buildMock: vi.fn(() => ({ kind: "query" })),
-}));
-
-vi.mock("@business-platform/database", () => ({
-  db: {
-    sql: {
-      public: {
-        documentChunk: {
-          insert: vi.fn(() => ({
-            returning: vi.fn(() => ({
-              build: buildMock,
-            })),
-          })),
-          select: vi.fn(() => ({
-            where: vi.fn(() => ({
-              build: buildMock,
-            })),
-          })),
-        },
-      },
-    },
-  },
-  getDbRuntime: getDbRuntimeMock,
-}));
-
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getDocumentChunks,
   saveDocumentChunks,
+  searchSimilarChunks,
 } from "./document-chunk-storage.js";
+const { queryMock, generateEmbeddingMock } = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  generateEmbeddingMock: vi.fn(),
+}));
+
+vi.mock("@business-platform/ai", () => ({
+  generateEmbedding: generateEmbeddingMock,
+}));
+
+vi.mock("./postgres.js", () => ({
+  postgresPool: {
+    query: queryMock,
+  },
+}));
+
 import type { ProcessedChunk } from "./process-document.js";
 
 const sampleChunk: ProcessedChunk = {
@@ -56,8 +35,8 @@ const sampleChunk: ProcessedChunk = {
 describe("document chunk storage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getDbRuntimeMock.mockResolvedValue({ query: queryMock });
-    queryMock.mockResolvedValue([]);
+    generateEmbeddingMock.mockResolvedValue(Array(384).fill(0.1));
+    queryMock.mockResolvedValue({ rows: [] });
   });
 
   it("saves each chunk", async () => {
@@ -67,13 +46,14 @@ describe("document chunk storage", () => {
     ]);
 
     expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(generateEmbeddingMock).toHaveBeenCalledTimes(2);
   });
 
   it("does nothing for an empty chunk list", async () => {
     await saveDocumentChunks([]);
 
-    expect(getDbRuntimeMock).not.toHaveBeenCalled();
     expect(queryMock).not.toHaveBeenCalled();
+    expect(generateEmbeddingMock).not.toHaveBeenCalled();
   });
 
   it("propagates database errors", async () => {
@@ -82,11 +62,70 @@ describe("document chunk storage", () => {
     await expect(saveDocumentChunks([sampleChunk])).rejects.toThrow(
       "Database unavailable",
     );
+
   });
 
   it("queries chunks for the requested organization and document", async () => {
-    await getDocumentChunks(5, 10);
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 1, content: sampleChunk.text }],
+    });
 
+    const rows = await getDocumentChunks(5, 10);
+
+    expect(rows).toHaveLength(1);
     expect(queryMock).toHaveBeenCalledTimes(1);
   });
+  
+  it("searches chunks using vector similarity and organization isolation", async () => {
+    const matchingChunk = {
+      id: 1,
+      documentId: 10,
+      organizationId: 5,
+      chunkIndex: 0,
+      content: "Employees receive 20 annual leaves.",
+      source: "leave-policy.txt",
+      similarity: 0.95,
+    };
+
+    queryMock.mockResolvedValueOnce({
+      rows: [matchingChunk],
+    });
+
+    const results = await searchSimilarChunks(
+      5,
+      "How many annual leaves do employees get?",
+      3,
+    );
+
+    expect(generateEmbeddingMock).toHaveBeenCalledWith(
+      "How many annual leaves do employees get?",
+    );
+
+    expect(queryMock).toHaveBeenCalledTimes(1);
+
+    const [sql, params] = queryMock.mock.calls[0]!;
+
+    expect(sql).toContain('"organizationId" = $2');
+    expect(sql).toContain("embedding <=> $1::vector");
+    expect(sql).toContain("ORDER BY embedding <=> $1::vector");
+    expect(params).toEqual([
+      `[${Array(384).fill(0.1).join(",")}]`,
+      5,
+      3,
+    ]);
+
+    expect(results).toEqual([matchingChunk]);
+  });
+
+  it("returns an empty array when no chunks match", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] });
+
+    const results = await searchSimilarChunks(
+      5,
+      "A question without matching documents",
+    );
+
+    expect(results).toEqual([]);
+  });
+
 });

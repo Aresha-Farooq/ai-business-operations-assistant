@@ -298,4 +298,3 @@ model DocumentChunk {
   @@unique([documentId, chunkIndex])
   @@index([organizationId, documentId])
 }
-
