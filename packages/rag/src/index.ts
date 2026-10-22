@@ -6,3 +6,4 @@ export * from "./xlsx-extractor.js";
 export * from "./extract-document.js";
 export * from "./process-document.js";
 export * from "./document-chunk-storage.js";
+export { answerQuestion } from "./answer-question.js";

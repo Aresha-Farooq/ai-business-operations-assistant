@@ -19,6 +19,7 @@
     "@prisma/cli-engine": "^0.4.0",
     "@types/node": "^22.20.3",
     "prisma": "^8.0.0-rc.15",
+    "tsx": "^4.23.15",
     "vitest": "^4.1.11"
   },
   "dependencies": {
