@@ -1,6 +1,4 @@
 
-import { pipeline } from "@huggingface/transformers";
-
 export type EmbeddingVector = number[];
 
 export interface EmbeddingProvider {
@@ -9,10 +7,13 @@ export interface EmbeddingProvider {
 
 const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 
-function loadExtractor() {
+async function loadExtractor() {
+  const { pipeline } = await import(
+    /* webpackIgnore: true */ "@huggingface/transformers"
+  );
+
   return pipeline("feature-extraction", MODEL_ID);
 }
-
 let extractorPromise: ReturnType<typeof loadExtractor> | undefined;
 
 export const localEmbeddingProvider: EmbeddingProvider = {
@@ -39,7 +40,7 @@ export const localEmbeddingProvider: EmbeddingProvider = {
 
 export async function generateEmbedding(
   text: string,
-  provider: EmbeddingProvider = localEmbeddingProvider
+  provider: EmbeddingProvider = localEmbeddingProvider,
 ): Promise<EmbeddingVector> {
   const normalizedText = text.trim();
 
@@ -49,10 +50,7 @@ export async function generateEmbedding(
 
   const vector = await provider.embed(normalizedText);
 
-  if (
-    vector.length !== 384 ||
-    !vector.every(Number.isFinite)
-  ) {
+  if (vector.length !== 384 || !vector.every(Number.isFinite)) {
     throw new Error("Embedding provider returned an invalid vector.");
   }
 

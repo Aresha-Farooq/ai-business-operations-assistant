@@ -1,6 +1,12 @@
 
 import type { ProcessedChunk } from "./process-document.js";
-import { generateEmbedding } from "@business-platform/ai";
+async function generateEmbedding(text: string): Promise<number[]> {
+  const { generateEmbedding } = await import(
+    "../../ai/src/embeddings.js"
+  );
+
+  return generateEmbedding(text);
+}
 import { postgresPool } from "./postgres.js";
 
 export async function saveDocumentChunks(

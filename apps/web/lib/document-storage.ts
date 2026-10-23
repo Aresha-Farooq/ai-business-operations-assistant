@@ -1,4 +1,4 @@
-import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { mkdir, writeFile, unlink, readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -56,4 +56,19 @@ export async function deleteDocumentFile(
       throw error;
     }
   }
+}
+
+export async function readDocumentFile(
+  storageKey: string
+): Promise<Buffer> {
+  if (
+    !storageKey ||
+    path.basename(storageKey) !== storageKey ||
+    storageKey.includes("..")
+  ) {
+    throw new Error("Invalid storage key.");
+  }
+
+  const filePath = path.join(STORAGE_DIR, storageKey);
+  return readFile(filePath);
 }
