@@ -2,11 +2,24 @@
 import { searchSimilarChunks } from "./document-chunk-storage.js";
 import { generateAnswer } from "../../ai/src/generate-answer.js";
 import { validateAnswer } from "../../ai/src/validate-answer.js";
+
+export type AnswerCitation = {
+  documentId: number;
+  chunkIndex: number;
+  source: string;
+  content: string;
+};
+
+export type AnswerQuestionResult = {
+  answer: string;
+  citations: AnswerCitation[];
+};
+
 export async function answerQuestion(
   organizationId: number,
   question: string,
   limit: number = 5,
-): Promise<string> {
+): Promise<AnswerQuestionResult> {
   if (!question.trim()) {
     throw new Error("Question cannot be empty");
   }
@@ -32,10 +45,25 @@ export async function answerQuestion(
   );
 
   if (!validation.isGrounded) {
-    console.warn("AI answer failed grounding validation:", validation.reason);
+    console.warn(
+      "AI answer failed grounding validation:",
+      validation.reason,
+    );
 
-    return "I couldn't verify a reliable answer from the available company documents. Please consult the relevant company policy or an authorized team member.";
+    return {
+      answer:
+        "I couldn't verify a reliable answer from the available company documents. Please consult the relevant company policy or an authorized team member.",
+      citations: [],
+    };
   }
 
-  return answer.trim();
+  return {
+    answer: answer.trim(),
+    citations: chunks.map((chunk) => ({
+      documentId: Number(chunk.documentId),
+      chunkIndex: Number(chunk.chunkIndex),
+      source: String(chunk.source ?? "Unknown source"),
+      content: String(chunk.content),
+    })),
+  };
 }

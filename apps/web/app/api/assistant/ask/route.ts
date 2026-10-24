@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       question.trim()
     );
 
-    return NextResponse.json({ answer });
+   return NextResponse.json(answer);
   } catch (error) {
     console.error("Assistant API error:", error);
 

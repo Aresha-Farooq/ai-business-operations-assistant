@@ -45,7 +45,7 @@ const navigation: NavItem[] = [
     href: "/dashboard/assistant",
     icon: AssistantIcon,
   },
-  { id: "documents", label: "Documents", comingSoon: true, icon: DocumentsIcon },
+  { id: "documents", label: "Documents", href: "/dashboard/documents", icon: DocumentsIcon },
   {
     id: "knowledge",
     label: "Knowledge Base",
@@ -225,3 +225,4 @@ export function DashboardShell({ workspace, children }: DashboardShellProps) {
     </div>
   );
 }
+

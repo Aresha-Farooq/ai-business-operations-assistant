@@ -80,10 +80,16 @@ export default async function DashboardPage() {
             Knowledge sources
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            A document management page is not available yet. Upload and
-            processing remain on the existing API.
-          </p>
-          <p className="mt-4 text-sm text-slate-400">Coming soon</p>
+  Upload company documents, review approval requests, and manage
+  knowledge sources for your AI assistant.
+</p>
+
+<Link
+  href="/dashboard/documents"
+  className="mt-4 inline-block text-sm font-medium text-slate-900 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+>
+  Manage documents
+</Link>
         </article>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

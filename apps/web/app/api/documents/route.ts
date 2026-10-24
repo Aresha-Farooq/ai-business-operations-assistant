@@ -187,3 +187,36 @@ if (!isValidContent) {
     );
   }
 }
+export async function GET() {
+  try {
+    const user = await requireRole(["OWNER"]);
+    const runtime = await getDbRuntime();
+
+    const query = db.sql.public.document
+      .select(
+        "id",
+        "name",
+        "mimeType",
+        "sizeBytes",
+        "status",
+        "approvalStatus",
+        "createdAt",
+        "updatedAt",
+      )
+      .where((fields, fns) =>
+        fns.eq(fields.organizationId, user.organizationId),
+      )
+      .build();
+
+    const documents = await runtime.query(query);
+
+    return NextResponse.json({ documents });
+  } catch (error) {
+    console.error("Document listing failed:", error);
+
+    return NextResponse.json(
+      { error: "Unable to load documents." },
+      { status: 500 },
+    );
+  }
+}

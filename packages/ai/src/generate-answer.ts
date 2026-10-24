@@ -1,5 +1,16 @@
-
 import { GoogleGenAI } from "@google/genai";
+
+const MODEL = "gemini-3.8-flash";
+const MAX_ATTEMPTS = 3;
+
+function isTemporaryError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("status" in error)) {
+    return false;
+  }
+
+  const status = error.status;
+  return [429, 500, 502, 503, 504].includes(Number(status));
+}
 
 export async function generateAnswer(
   question: string,
@@ -17,9 +28,7 @@ export async function generateAnswer(
 
   const ai = new GoogleGenAI({ apiKey });
 
-  const response = await ai.models.generateContent({
-  model: "gemini-3.8-flash",
-    contents: `
+  const contents = `
 You are a business operations assistant.
 Answer the user's question using only the provided document context.
 If the context does not contain the answer, say you could not find the information.
@@ -30,14 +39,39 @@ ${context.map((item, index) => `[${index + 1}] ${item}`).join("\n\n")}
 
 User question:
 ${question}
-`,
-  });
+`;
 
-  const answer = response.text?.trim();
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: MODEL,
+        contents,
+      });
 
-  if (!answer) {
-    throw new Error("Gemini returned an empty answer");
+      const answer = response.text?.trim();
+
+      if (!answer) {
+        throw new Error("Gemini returned an empty answer");
+      }
+
+      return answer;
+    } catch (error) {
+      if (!isTemporaryError(error) || attempt === MAX_ATTEMPTS) {
+        console.error(
+          `Gemini answer generation failed (attempt ${attempt}/${MAX_ATTEMPTS}).`,
+          error,
+        );
+        throw error;
+      }
+
+      const delayMs = attempt * 1500;
+      console.warn(
+        `Gemini temporarily unavailable. Retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS}).`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
 
-  return answer;
+  throw new Error("Gemini answer generation failed after all retry attempts.");
 }

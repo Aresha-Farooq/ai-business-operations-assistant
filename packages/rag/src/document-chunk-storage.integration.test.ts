@@ -4,22 +4,24 @@ import { postgresPool } from "./postgres.js";
 import {
   saveDocumentChunks,
   getDocumentChunks,
+  searchSimilarChunks,
 } from "./document-chunk-storage.js";
 import type { ProcessedChunk } from "./process-document.js";
 
-vi.mock("@business-platform/ai", () => ({
+vi.mock("../../ai/src/embeddings.js", () => ({
   generateEmbedding: vi.fn(async () => Array(384).fill(0.1)),
 }));
 
 describe("document chunk storage integration", () => {
-  let organizationId: number | undefined;
-  let documentId: number | undefined;
+  const organizationIds: number[] = [];
+  const documentIds: number[] = [];
 
   afterAll(async () => {
     try {
-      if (documentId !== undefined) {
+      for (const documentId of documentIds) {
         await postgresPool.query(
-          `DELETE FROM public."documentChunk" WHERE "documentId" = $1`,
+          `DELETE FROM public."documentChunk"
+           WHERE "documentId" = $1`,
           [documentId],
         );
 
@@ -29,37 +31,12 @@ describe("document chunk storage integration", () => {
         );
       }
 
-      if (organizationId !== undefined) {
+      for (const organizationId of organizationIds) {
         await postgresPool.query(
           `DELETE FROM public.organization WHERE id = $1`,
           [organizationId],
         );
       }
-      
-it("does not return chunks belonging to another organization", async () => {
-  const result = await postgresPool.query(
-    `SELECT id
-     FROM public."documentChunk"
-     WHERE "organizationId" = $1
-       AND "documentId" = $2`,
-    [organizationId, documentId],
-  );
-
-  expect(result.rows.length).toBeGreaterThan(0);
-
-  const otherOrganizationId = -999;
-
-  const searchResults = await postgresPool.query(
-    `SELECT content
-     FROM public."documentChunk"
-     WHERE "organizationId" = $1
-       AND embedding IS NOT NULL`,
-    [otherOrganizationId],
-  );
-
-  expect(searchResults.rows).toHaveLength(0);
-});
-
     } finally {
       await postgresPool.end();
     }
@@ -74,31 +51,24 @@ it("does not return chunks belonging to another organization", async () => {
       ["RAG Integration Test"],
     );
 
-    const createdOrganization = organizationResult.rows[0];
-
-    if (!createdOrganization) {
+    const organization = organizationResult.rows[0];
+    if (!organization) {
       throw new Error("Failed to create test organization");
     }
 
-    organizationId = createdOrganization.id;
+    organizationIds.push(organization.id);
 
     const documentResult = await postgresPool.query<{ id: number }>(
       `INSERT INTO public.document
         (
-          "organizationId",
-          name,
-          "mimeType",
-          "sizeBytes",
-          "storagePath",
-          status,
-          "approvalStatus",
-          "createdAt",
-          "updatedAt"
+          "organizationId", name, "mimeType", "sizeBytes",
+          "storagePath", status, "approvalStatus",
+          "createdAt", "updatedAt"
         )
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
        RETURNING id`,
       [
-        organizationId,
+        organization.id,
         "integration-test.txt",
         "text/plain",
         36,
@@ -108,19 +78,18 @@ it("does not return chunks belonging to another organization", async () => {
       ],
     );
 
-    const createdDocument = documentResult.rows[0];
-
-    if (!createdDocument) {
+    const document = documentResult.rows[0];
+    if (!document) {
       throw new Error("Failed to create test document");
     }
 
-    documentId = createdDocument.id;
+    documentIds.push(document.id);
 
     const chunk: ProcessedChunk = {
       index: 0,
       text: "Employees receive 20 annual leaves.",
-      documentId,
-      organizationId,
+      documentId: document.id,
+      organizationId: organization.id,
       documentType: "text/plain",
       source: "integration-test.txt",
       processedAt: new Date().toISOString(),
@@ -128,24 +97,16 @@ it("does not return chunks belonging to another organization", async () => {
 
     await saveDocumentChunks([chunk]);
 
-const searchResults = await postgresPool.query(
-  `SELECT
-     content,
-     1 - (embedding <=> $1::vector) AS similarity
-   FROM public."documentChunk"
-   WHERE "organizationId" = $2
-     AND embedding IS NOT NULL
-   ORDER BY embedding <=> $1::vector
-   LIMIT $3`,
-  [
-    `[${Array(384).fill(0.1).join(",")}]`,
-    organizationId,
-    5,
-  ],
-);
+    const results = await searchSimilarChunks(
+      organization.id,
+      "How many annual leaves do employees receive?",
+      5,
+    );
 
-expect(searchResults.rows.length).toBeGreaterThan(0);
-expect(searchResults.rows[0].content).toBe(chunk.text);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].content).toBe(chunk.text);
+    expect(results[0].similarity).toBeDefined();
+    expect(results[0].documentType).toBe("text/plain");
 
     const vectorResult = await postgresPool.query<{
       has_native_embedding: boolean;
@@ -158,17 +119,141 @@ expect(searchResults.rows[0].content).toBe(chunk.text);
        WHERE "organizationId" = $1
          AND "documentId" = $2
          AND "chunkIndex" = $3`,
-      [organizationId, documentId, chunk.index],
+      [organization.id, document.id, chunk.index],
     );
 
     expect(vectorResult.rows[0]?.has_native_embedding).toBe(true);
     expect(vectorResult.rows[0]?.dimensions).toBe(384);
 
-    const rows = await getDocumentChunks(organizationId, documentId);
+    const rows = await getDocumentChunks(organization.id, document.id);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].content).toBe(chunk.text);
-    expect(rows[0].organizationId).toBe(organizationId);
-    expect(rows[0].documentId).toBe(documentId);
+    expect(rows[0].organizationId).toBe(organization.id);
+    expect(rows[0].documentId).toBe(document.id);
+  }, 120_000);
+
+  it("does not return chunks belonging to another organization", async () => {
+    const createOrganization = async (name: string) => {
+      const result = await postgresPool.query<{ id: number }>(
+        `INSERT INTO public.organization
+          (name, "createdAt", "updatedAt")
+         VALUES ($1, NOW(), NOW())
+         RETURNING id`,
+        [name],
+      );
+
+      const organization = result.rows[0];
+      if (!organization) {
+        throw new Error(`Failed to create organization: ${name}`);
+      }
+
+      organizationIds.push(organization.id);
+      return organization.id;
+    };
+
+    const createDocument = async (
+      organizationId: number,
+      name: string,
+    ) => {
+      const result = await postgresPool.query<{ id: number }>(
+        `INSERT INTO public.document
+          (
+            "organizationId", name, "mimeType", "sizeBytes",
+            "storagePath", status, "approvalStatus",
+            "createdAt", "updatedAt"
+          )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         RETURNING id`,
+        [
+          organizationId,
+          name,
+          "text/plain",
+          36,
+          `integration-test-${name}`,
+          "PROCESSED",
+          "APPROVED",
+        ],
+      );
+
+      const document = result.rows[0];
+      if (!document) {
+        throw new Error(`Failed to create document: ${name}`);
+      }
+
+      documentIds.push(document.id);
+      return document.id;
+    };
+
+    const organizationA = await createOrganization(
+      "RAG Isolation Test A",
+    );
+    const organizationB = await createOrganization(
+      "RAG Isolation Test B",
+    );
+
+    const documentA = await createDocument(
+      organizationA,
+      "isolation-a.txt",
+    );
+    const documentB = await createDocument(
+      organizationB,
+      "isolation-b.txt",
+    );
+
+    const createChunk = (
+      organizationId: number,
+      documentId: number,
+      text: string,
+      source: string,
+    ): ProcessedChunk => ({
+      index: 0,
+      text,
+      documentId,
+      organizationId,
+      documentType: "text/plain",
+      source,
+      processedAt: new Date().toISOString(),
+    });
+
+    await saveDocumentChunks([
+      createChunk(
+        organizationA,
+        documentA,
+        "Organization A has 20 annual leaves.",
+        "isolation-a.txt",
+      ),
+      createChunk(
+        organizationB,
+        documentB,
+        "Organization B has 30 annual leaves.",
+        "isolation-b.txt",
+      ),
+    ]);
+
+    const results = await searchSimilarChunks(
+      organizationA,
+      "How many annual leaves are available?",
+      10,
+    );
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(
+      results.every(
+        (result) => Number(result.organizationId) === organizationA,
+      ),
+    ).toBe(true);
+
+    expect(
+      results.some((result) =>
+        String(result.content).includes("Organization A"),
+      ),
+    ).toBe(true);
+
+    expect(
+      results.some((result) =>
+        String(result.content).includes("Organization B"),
+      ),
+    ).toBe(false);
   }, 120_000);
 });

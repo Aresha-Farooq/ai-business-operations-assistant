@@ -2,7 +2,6 @@ import { mkdir, writeFile, unlink, readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-
 const STORAGE_DIR = path.join(
   process.cwd(),
   ".private-storage",

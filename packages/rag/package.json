@@ -5,9 +5,13 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts"
-  },
+  
+"exports": {
+  ".": "./src/index.ts",
+  "./processing": "./src/process-document.ts",
+  "./storage": "./src/document-chunk-storage.ts"
+},
+
   "scripts": {
     "test": "vitest run"
   },

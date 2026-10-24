@@ -4,13 +4,14 @@ import {
   getDocumentChunks,
   saveDocumentChunks,
   searchSimilarChunks,
+  searchExactChunks
 } from "./document-chunk-storage.js";
 const { queryMock, generateEmbeddingMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   generateEmbeddingMock: vi.fn(),
 }));
 
-vi.mock("@business-platform/ai", () => ({
+vi.mock("../../ai/src/embeddings.js", () => ({
   generateEmbedding: generateEmbeddingMock,
 }));
 
@@ -126,6 +127,104 @@ describe("document chunk storage", () => {
     );
 
     expect(results).toEqual([]);
+  });
+it("propagates database errors", async () => {
+  queryMock.mockRejectedValueOnce(new Error("Database unavailable"));
+
+  await expect(saveDocumentChunks([sampleChunk])).rejects.toThrow(
+    "Database unavailable",
+  );
+});
+
+
+it("always scopes similarity search to the requested organization", async () => {
+  queryMock.mockResolvedValueOnce({
+    rows: [
+      {
+        id: 1,
+        documentId: 10,
+        organizationId: 5,
+        chunkIndex: 0,
+        content: "Employees receive 20 annual leaves.",
+        documentType: "text/plain",
+        source: "leave-policy.txt",
+        similarity: 0.95,
+      },
+    ],
+  });
+
+  const results = await searchSimilarChunks(
+    5,
+    "How many annual leaves?",
+    3,
+    { documentId: 10, documentType: "text/plain" },
+  );
+
+  const [sql, params] = queryMock.mock.calls[0]!;
+
+  expect(sql).toContain('"organizationId" = $2');
+  expect(params[1]).toBe(5);
+  expect(sql).toContain('"documentId"');
+  expect(sql).toContain('"documentType"');
+
+  expect(results).toHaveLength(1);
+  expect(results[0].organizationId).toBe(5);
+});
+
+
+  it("searches chunks using exact text and organization isolation", async () => {
+    const matchingChunk = {
+      id: 1,
+      documentId: 10,
+      organizationId: 5,
+      chunkIndex: 0,
+      content: "Employees receive 20 annual leaves.",
+      documentType: "text/plain",
+      source: "leave-policy.txt",
+      processedAt: "2026-10-14T06:00:00.000Z",
+    };
+
+    queryMock.mockResolvedValueOnce({
+      rows: [matchingChunk],
+    });
+
+    const results = await searchExactChunks(
+      5,
+      "20 annual leaves",
+      10,
+    );
+
+    const [sql, params] = queryMock.mock.calls[0]!;
+
+    expect(sql).toContain('"organizationId" = $1');
+    expect(sql).toContain("POSITION($2 IN content) > 0");
+    expect(params).toEqual([5, "20 annual leaves", 10]);
+    expect(generateEmbeddingMock).not.toHaveBeenCalled();
+    expect(results).toEqual([matchingChunk]);
+  });
+
+  it("rejects empty exact-search text", async () => {
+    await expect(searchExactChunks(5, "   ")).rejects.toThrow(
+      "Search text cannot be empty.",
+    );
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid exact-search limits", async () => {
+    await expect(searchExactChunks(5, "annual leaves", 0)).rejects.toThrow(
+      "Search limit must be an integer between 1 and 100.",
+    );
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid organization IDs for exact search", async () => {
+    await expect(searchExactChunks(0, "annual leaves")).rejects.toThrow(
+      "A valid organization ID is required.",
+    );
+
+    expect(queryMock).not.toHaveBeenCalled();
   });
 
 });
