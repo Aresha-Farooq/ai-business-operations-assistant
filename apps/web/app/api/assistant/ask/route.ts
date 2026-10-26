@@ -22,18 +22,21 @@ export async function POST(request: Request) {
       typeof body?.question === "string" ? body.question.trim() : "";
     const conversationId = body?.conversationId;
 
-    if (!question) {
-      if (question.length > 2000) {
+    
+if (!question) {
+  return NextResponse.json(
+    { error: "Question is required." },
+    { status: 400 },
+  );
+}
+
+if (question.length > 2000) {
   return NextResponse.json(
     { error: "Question must be 2000 characters or fewer." },
     { status: 400 },
   );
 }
-      return NextResponse.json(
-        { error: "Question is required." },
-        { status: 400 },
-      );
-    }
+
 
     if (
       !Number.isSafeInteger(conversationId) ||
