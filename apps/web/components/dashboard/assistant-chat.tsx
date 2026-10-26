@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -13,16 +14,33 @@ import { ASSISTANT_SUGGESTED_QUESTIONS } from "@/lib/assistant-questions";
 
 type ChatRole = "user" | "assistant";
 
+type AnswerCitation = {
+  documentId: number;
+  chunkIndex: number;
+  source: string;
+  content: string;
+};
+
 type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  citations?: AnswerCitation[];
   isError?: boolean;
   isUnavailable?: boolean;
 };
 
+type ConversationItem = {
+  id: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AskSuccess = {
   answer: string;
+  citations: AnswerCitation[];
+  conversationId: number;
 };
 
 type AskFailure = {
@@ -44,17 +62,15 @@ function looksLikeNoRelevantInformation(answer: string) {
   );
 }
 
-async function askQuestion(question: string) {
+async function askQuestion(question: string, conversationId: number) {
   const response = await fetch("/api/assistant/ask", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, conversationId }),
   });
 
-  let data: AskSuccess | AskFailure | null = null;
+  let data: (AskSuccess & { error?: string }) | AskFailure | null = null;
 
   try {
     data = (await response.json()) as AskSuccess | AskFailure;
@@ -104,15 +120,27 @@ async function askQuestion(question: string) {
   return {
     ok: true as const,
     answer: answer.trim(),
+    conversationId:
+      data && "conversationId" in data ? data.conversationId : conversationId,
+    citations:
+      data && "citations" in data && Array.isArray(data.citations)
+        ? data.citations
+        : [],
   };
 }
 
 export function AssistantChat() {
   const searchParams = useSearchParams();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+
   const endRef = useRef<HTMLDivElement | null>(null);
   const autoAsked = useRef(false);
 
@@ -120,32 +148,138 @@ export function AssistantChat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  async function loadConversations() {
+    setHistoryLoading(true);
+    setHistoryError("");
+
+    try {
+      const response = await fetch("/api/assistant/conversations", {
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to load conversation history.");
+      }
+
+      const data = await response.json();
+      setConversations(data.conversations ?? []);
+    } catch (error) {
+      console.error("Loading conversations failed:", error);
+      setHistoryError("Conversation history could not be loaded.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadConversations();
+  }, []);
+
+  async function createConversation(title: string) {
+    const response = await fetch("/api/assistant/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ title: title.slice(0, 120) }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to create a conversation.");
+    }
+
+    const data = await response.json();
+    const conversation = data.conversation as ConversationItem;
+
+    setConversations((current) => [
+      conversation,
+      ...current.filter((item) => item.id !== conversation.id),
+    ]);
+
+    setConversationId(conversation.id);
+
+    return conversation.id;
+  }
+
+  async function startNewConversation() {
+    if (loading) return;
+
+    setConversationId(null);
+    setMessages([]);
+    setInput("");
+    setAuthRequired(false);
+  }
+
+  async function openConversation(id: number) {
+    if (loading || id === conversationId) return;
+
+    try {
+      setHistoryError("");
+
+      const response = await fetch(
+        `/api/assistant/conversations/${id}`,
+        { credentials: "same-origin" },
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to open this conversation.");
+      }
+
+      const data = await response.json();
+
+      setConversationId(data.conversation.id);
+      setMessages(
+        (data.messages ?? []).map(
+          (message: {
+            id: string | number;
+            role: ChatRole;
+            content: string;
+            citations?: AnswerCitation[];
+          }) => ({
+            id: String(message.id),
+            role: message.role,
+            content: message.content,
+            citations: message.citations ?? [],
+            isUnavailable:
+              message.role === "assistant" &&
+              looksLikeNoRelevantInformation(message.content),
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error("Opening conversation failed:", error);
+      setHistoryError("Unable to open this conversation.");
+    }
+  }
+
   async function submitQuestion(question: string) {
     const trimmed = question.trim();
 
-    if (!trimmed || loading) {
-      return;
-    }
+    if (!trimmed || loading) return;
 
     setInput("");
     setLoading(true);
     setAuthRequired(false);
 
-    const userMessage: ChatMessage = {
-      id: createId(),
-      role: "user",
-      content: trimmed,
-    };
-
-    setMessages((current) => [...current, userMessage]);
+    setMessages((current) => [
+      ...current,
+      {
+        id: createId(),
+        role: "user",
+        content: trimmed,
+      },
+    ]);
 
     try {
-      const result = await askQuestion(trimmed);
+      let activeConversationId = conversationId;
+
+      if (activeConversationId === null) {
+        activeConversationId = await createConversation(trimmed);
+      }
+
+      const result = await askQuestion(trimmed, activeConversationId);
 
       if (!result.ok) {
-        if (result.status === 401) {
-          setAuthRequired(true);
-        }
+        if (result.status === 401) setAuthRequired(true);
 
         setMessages((current) => [
           ...current,
@@ -159,16 +293,23 @@ export function AssistantChat() {
         return;
       }
 
+      setConversationId(result.conversationId);
+
       setMessages((current) => [
         ...current,
         {
           id: createId(),
           role: "assistant",
           content: result.answer,
+          citations: result.citations,
           isUnavailable: looksLikeNoRelevantInformation(result.answer),
         },
       ]);
-    } catch {
+
+      void loadConversations();
+    } catch (error) {
+      console.error("Submitting assistant question failed:", error);
+
       setMessages((current) => [
         ...current,
         {
@@ -186,12 +327,11 @@ export function AssistantChat() {
   useEffect(() => {
     const preset = searchParams.get("q");
 
-    if (!preset || autoAsked.current) {
-      return;
-    }
+    if (!preset || autoAsked.current) return;
 
     autoAsked.current = true;
     void submitQuestion(preset);
+
     // Intentionally run once for a preset query from the dashboard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -219,138 +359,213 @@ export function AssistantChat() {
         </p>
       </div>
 
-      <div
-        className="flex-1 overflow-y-auto px-4 py-6 md:px-8"
-        aria-live="polite"
-      >
-        {messages.length === 0 && !loading ? (
-          <div className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
-            <p className="font-medium text-slate-800">Start a conversation</p>
-            <p className="mt-2 text-sm text-slate-500">
-              Ask a question about company policies, leave, or the contents of
-              your knowledge documents.
-            </p>
-            <ul className="mt-5 grid gap-2 text-left sm:grid-cols-1">
-              {ASSISTANT_SUGGESTED_QUESTIONS.map((question) => (
-                <li key={question}>
+      <div className="flex min-h-0 flex-1">
+        <aside className="w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-3">
+          <button
+            type="button"
+            onClick={() => void startNewConversation()}
+            disabled={loading}
+            className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            + New chat
+          </button>
+
+          <h3 className="mb-2 mt-5 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Recent conversations
+          </h3>
+
+          {historyLoading ? (
+            <p className="px-1 text-sm text-slate-500">Loading history...</p>
+          ) : conversations.length === 0 ? (
+            <p className="px-1 text-sm text-slate-500">No saved chats yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {conversations.map((conversation) => (
+                <li key={conversation.id}>
                   <button
                     type="button"
-                    onClick={() => void submitQuestion(question)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-slate-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                    onClick={() => void openConversation(conversation.id)}
+                    disabled={loading}
+                    title={conversation.title}
+                    className={`w-full truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-white disabled:opacity-50 ${
+                      conversation.id === conversationId
+                        ? "bg-white font-medium text-slate-900 shadow-sm"
+                        : "text-slate-600"
+                    }`}
                   >
-                    {question}
+                    {conversation.title}
                   </button>
                 </li>
               ))}
             </ul>
-          </div>
-        ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
-                    message.role === "user"
-                      ? "bg-slate-900 text-white"
-                      : message.isError
-                        ? "border border-rose-200 bg-rose-50 text-rose-800"
-                        : message.isUnavailable
-                          ? "border border-amber-200 bg-amber-50 text-amber-950"
-                          : "border border-slate-200 bg-white text-slate-800"
-                  }`}
-                >
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
-                    {message.role === "user" ? "You" : "Assistant"}
-                  </p>
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                  {message.isUnavailable ? (
-                    <p className="mt-2 text-xs font-medium">
-                      No relevant information was found in the available
-                      documents.
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+          )}
 
-            {loading ? (
-              <div className="flex justify-start">
-                <div
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm"
-                  role="status"
-                >
-                  The assistant is reviewing your documents...
-                </div>
+          {historyError ? (
+            <p role="alert" className="mt-3 text-xs text-rose-700">
+              {historyError}
+            </p>
+          ) : null}
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8" aria-live="polite">
+            {messages.length === 0 && !loading ? (
+              <div className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
+                <p className="font-medium text-slate-800">Start a conversation</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Ask a question about company policies, leave, or the contents
+                  of your knowledge documents.
+                </p>
+                <ul className="mt-5 grid gap-2 text-left">
+                  {ASSISTANT_SUGGESTED_QUESTIONS.map((question) => (
+                    <li key={question}>
+                      <button
+                        type="button"
+                        onClick={() => void submitQuestion(question)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-slate-400 hover:bg-white"
+                      >
+                        {question}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="mx-auto flex max-w-3xl flex-col gap-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                        message.role === "user"
+                          ? "bg-slate-900 text-white"
+                          : message.isError
+                            ? "border border-rose-200 bg-rose-50 text-rose-800"
+                            : message.isUnavailable
+                              ? "border border-amber-200 bg-amber-50 text-amber-950"
+                              : "border border-slate-200 bg-white text-slate-800"
+                      }`}
+                    >
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
+                        {message.role === "user" ? "You" : "Assistant"}
+                      </p>
+
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+
+                      {message.role === "assistant" &&
+                      message.citations?.length ? (
+                        <div className="mt-4 border-t border-slate-200 pt-3">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Sources
+                          </p>
+                          <ul className="space-y-2">
+                            {message.citations.map((citation, index) => (
+                              <li
+                                key={`${citation.documentId}-${citation.chunkIndex}-${index}`}
+                                className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600"
+                              >
+                                <p className="font-medium text-slate-800">
+                                  {citation.source}
+                                </p>
+                                <p className="mt-1">
+                                  Document #{citation.documentId} · Chunk{" "}
+                                  {citation.chunkIndex}
+                                </p>
+                                <p className="mt-2 whitespace-pre-wrap">
+                                  {citation.content}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {message.isUnavailable ? (
+                        <p className="mt-2 text-xs font-medium">
+                          No relevant information was found in the available
+                          documents.
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+
+                {loading ? (
+                  <div className="flex justify-start">
+                    <div
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm"
+                      role="status"
+                    >
+                      The assistant is reviewing your documents...
+                    </div>
+                  </div>
+                ) : null}
+                <div ref={endRef} />
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 bg-white px-4 py-4 md:px-8">
+            {authRequired ? (
+              <p role="alert" className="mb-3 text-sm text-rose-700">
+                Your session is not authenticated.{" "}
+                <Link href="/login" className="font-medium underline">
+                  Sign in
+                </Link>{" "}
+                to continue.
+              </p>
+            ) : null}
+
+            {messages.length > 0 ? (
+              <div className="mx-auto mb-3 flex max-w-3xl flex-wrap gap-2">
+                {ASSISTANT_SUGGESTED_QUESTIONS.map((question) => (
+                  <button
+                    key={question}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void submitQuestion(question)}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:border-slate-400 hover:bg-white disabled:opacity-50"
+                  >
+                    {question}
+                  </button>
+                ))}
               </div>
             ) : null}
-            <div ref={endRef} />
-          </div>
-        )}
-      </div>
 
-      <div className="border-t border-slate-200 bg-white px-4 py-4 md:px-8">
-        {authRequired ? (
-          <p role="alert" className="mb-3 text-sm text-rose-700">
-            Your session is not authenticated.{" "}
-            <Link
-              href="/login"
-              className="font-medium underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+            <form
+              onSubmit={handleSubmit}
+              className="mx-auto flex max-w-3xl items-end gap-3"
             >
-              Sign in
-            </Link>{" "}
-            to continue.
-          </p>
-        ) : null}
-
-        {messages.length > 0 ? (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {ASSISTANT_SUGGESTED_QUESTIONS.map((question) => (
-              <button
-                key={question}
-                type="button"
+              <label htmlFor="assistant-question" className="sr-only">
+                Message to the AI assistant
+              </label>
+              <textarea
+                id="assistant-question"
+                rows={2}
+                value={input}
                 disabled={loading}
-                onClick={() => void submitQuestion(question)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 transition hover:border-slate-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:opacity-50"
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question about your business documents..."
+                className="min-h-[3rem] w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-700 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-50"
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {question}
+                Send
               </button>
-            ))}
+            </form>
+            <p className="mx-auto mt-2 max-w-3xl text-xs text-slate-500">
+              Press Enter to send. Shift+Enter adds a new line.
+            </p>
           </div>
-        ) : null}
-
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex max-w-3xl items-end gap-3"
-        >
-          <label htmlFor="assistant-question" className="sr-only">
-            Message to the AI assistant
-          </label>
-          <textarea
-            id="assistant-question"
-            rows={2}
-            value={input}
-            disabled={loading}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your business documents..."
-            className="min-h-[3rem] w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-700 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-50"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Send
-          </button>
-        </form>
-        <p className="mx-auto mt-2 max-w-3xl text-xs text-slate-500">
-          Press Enter to send. Shift+Enter adds a new line.
-        </p>
+        </div>
       </div>
     </div>
   );

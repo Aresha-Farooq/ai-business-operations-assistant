@@ -32,17 +32,25 @@ export async function answerQuestion(
 
   const context = chunks.map((chunk) => String(chunk.content));
 
-  const answer = await generateAnswer(question, context);
+console.time("RAG answer generation");
+
+const answer = await generateAnswer(question, context);
+
+console.timeEnd("RAG answer generation");
 
   if (typeof answer !== "string" || !answer.trim()) {
     throw new Error("The AI generated an empty or invalid answer.");
   }
 
-  const validation = await validateAnswer(
-    question,
-    context,
-    answer,
-  );
+ console.time("RAG answer validation");
+
+const validation = await validateAnswer(
+  question,
+  context,
+  answer,
+);
+
+console.timeEnd("RAG answer validation");
 
   if (!validation.isGrounded) {
     console.warn(

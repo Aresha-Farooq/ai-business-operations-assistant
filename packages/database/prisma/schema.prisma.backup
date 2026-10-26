@@ -1,0 +1,300 @@
+enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum DocumentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+
+model Organization {
+  id        Int      @id @default(autoincrement())
+  name      String
+slug String? @unique
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+  tickets Ticket[]
+documents Document[]
+  inventoryMovements InventoryMovement[]
+  users             User[]
+  customers         Customer[]
+  payments          Payment[]
+  documentChunks DocumentChunk[]
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  organizationId Int
+  role           UserRole @default(STAFF)
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Customer {
+  id             Int                @id @default(autoincrement())
+  name           String
+  email          String
+  phone          String?
+  organizationId Int
+  isActive       Boolean            @default(true)
+  deletedAt      TimestamptzString?
+  tickets Ticket[]
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Ticket {
+  id             Int            @id @default(autoincrement())
+  organizationId Int
+  customerId     Int
+  subject        String
+  description    String
+  priority       TicketPriority @default(MEDIUM)
+  status         TicketStatus   @default(OPEN)
+  assigneeId     Int?
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  customer Customer @relation(
+    fields: [customerId],
+    references: [id]
+  )
+}
+
+model Product {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String?
+  sku            String
+  purchasePrice  Float
+  salePrice      Float
+  stockQuantity  Int      @default(0)
+  minimumStock   Int      @default(0)
+
+  organizationId Int
+
+  isActive       Boolean  @default(true)
+  deletedAt      TimestamptzString?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+}
+
+
+model InventoryMovement {
+  id             Int      @id @default(autoincrement())
+  productId      Int
+  organizationId Int
+  quantity       Int
+  type           InventoryMovementType
+  reason         String?
+
+  product      Product      @relation(fields: [productId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  DAMAGE
+}
+
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  CANCELLED
+  COMPLETED
+}
+
+enum ShippingStatus {
+  NOT_SHIPPED
+  SHIPPED
+  DELIVERED
+}
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  CARD
+  JAZZCASH
+  EASYPAISA
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  customerId     Int
+  organizationId Int
+  status         OrderStatus @default(PENDING)
+  shippingStatus ShippingStatus @default(NOT_SHIPPED)
+  totalAmount    Float
+payments Payment[]
+  customer       Customer    @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  organization   Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  items          OrderItem[]
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  unitPrice Float
+
+  order     Order   @relation(
+    fields: [orderId],
+    references: [id]
+  )
+
+  product   Product @relation(
+    fields: [productId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Payment {
+  id                   Int           @id @default(autoincrement())
+  orderId              Int
+  organizationId       Int
+  amount               Float
+  currency             String
+  method               PaymentMethod
+  status               PaymentStatus @default(PENDING)
+  gateway              String?
+  gatewayTransactionId String?
+
+  order Order @relation(
+    fields: [orderId],
+    references: [id]
+  )
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+
+model Document {
+  id             Int            @id @default(autoincrement())
+  organizationId Int
+  name           String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  status         DocumentStatus @default(UPLOADED)
+  approvalStatus DocumentApprovalStatus @default(PENDING)
+
+  
+  uploadedBy     Int?
+  createdAt      TimestamptzString @default(now())
+  updatedAt      temporal.updatedAtString()
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  chunks DocumentChunk[]
+}
+
+
+
+model DocumentChunk {
+  id             Int      @id @default(autoincrement())
+  documentId     Int
+  organizationId Int
+  chunkIndex     Int
+  content        String
+  documentType   String
+  source         String
+  processedAt    TimestamptzString @default(now())
+  createdAt      TimestamptzString @default(now())
+  embeddingJson String?
+  document Document @relation(
+    fields: [documentId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@unique([documentId, chunkIndex])
+  @@index([organizationId, documentId])
+}

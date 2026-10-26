@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = "gemini-3.8-flash";
+const MODEL = "gemini-3.1-flash-lite";
 const MAX_ATTEMPTS = 3;
 
 function isTemporaryError(error: unknown): boolean {
@@ -43,10 +43,17 @@ ${question}
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const response = await ai.models.generateContent({
-        model: MODEL,
-        contents,
-      });
+    const response = await Promise.race([
+  ai.models.generateContent({
+    model: MODEL,
+    contents,
+  }),
+  new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error("Gemini request timed out after 30 seconds"));
+    }, 30_000);
+  }),
+]);
 
       const answer = response.text?.trim();
 

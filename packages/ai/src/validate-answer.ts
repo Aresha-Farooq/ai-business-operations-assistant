@@ -27,7 +27,7 @@ export async function validateAnswer(
   const ai = new GoogleGenAI({ apiKey });
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash",
+  model: "gemini-3.1-flash-lite",
     contents: `
 You are a strict evaluator for a company-document question-answering system.
 

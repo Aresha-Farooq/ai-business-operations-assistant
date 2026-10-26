@@ -29,6 +29,7 @@ model Organization {
   id        Int      @id @default(autoincrement())
   name      String
 slug String? @unique
+conversations Conversation[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -48,7 +49,7 @@ model User {
   passwordHash   String
   organizationId Int
   role           UserRole @default(STAFF)
-
+conversations Conversation[]
   organization Organization @relation(
     fields: [organizationId],
     references: [id]
@@ -297,4 +298,48 @@ model DocumentChunk {
 
   @@unique([documentId, chunkIndex])
   @@index([organizationId, documentId])
+}
+
+model Conversation {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  userId         Int
+  title          String   @default("New conversation")
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  user User @relation(
+    fields: [userId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  messages Message[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@index([organizationId, userId, updatedAt])
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  role           String
+  content        String
+  citationsJson  String?
+
+  conversation Conversation @relation(
+    fields: [conversationId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  createdAt TimestamptzString @default(now())
+
+  @@index([conversationId, createdAt])
 }
