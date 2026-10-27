@@ -7,6 +7,9 @@ export type {
   EmbeddingVector,
   EmbeddingProvider,
 } from "./embeddings.js";
+export {
+  generateAnswer,
+  generateAnswerStream,
+} from "./generate-answer.js";
 
-export { generateAnswer } from "./generate-answer.js";
 export { validateAnswer } from "./validate-answer.js";

@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -37,12 +36,6 @@ type ConversationItem = {
   updatedAt: string;
 };
 
-type AskSuccess = {
-  answer: string;
-  citations: AnswerCitation[];
-  conversationId: number;
-};
-
 type AskFailure = {
   error?: string;
 };
@@ -62,7 +55,21 @@ function looksLikeNoRelevantInformation(answer: string) {
   );
 }
 
-async function askQuestion(question: string, conversationId: number) {
+type StreamEvent =
+  | { type: "token"; token: string }
+  | {
+      type: "done";
+      answer: string;
+      citations: AnswerCitation[];
+      conversationId: number;
+    }
+  | { type: "error"; error: string };
+
+async function askQuestion(
+  question: string,
+  conversationId: number,
+  onToken: (token: string) => void,
+) {
   const response = await fetch("/api/assistant/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -70,63 +77,119 @@ async function askQuestion(question: string, conversationId: number) {
     body: JSON.stringify({ question, conversationId }),
   });
 
-  let data: (AskSuccess & { error?: string }) | AskFailure | null = null;
-
-  try {
-    data = (await response.json()) as AskSuccess | AskFailure;
-  } catch {
-    data = null;
-  }
-
-  if (response.status === 401) {
-    return {
-      ok: false as const,
-      status: 401,
-      message:
-        "You are not signed in or your session has expired. Sign in again to ask the assistant.",
-    };
-  }
-
-  if (response.status === 400) {
-    return {
-      ok: false as const,
-      status: 400,
-      message:
-        (data && "error" in data && data.error) ||
-        "Please enter a question before sending.",
-    };
-  }
-
   if (!response.ok) {
+    let message = "The assistant could not generate an answer. Please try again.";
+
+    try {
+      const data = (await response.json()) as AskFailure;
+      if (data.error) message = data.error;
+    } catch {
+      // Keep the default error message.
+    }
+
     return {
       ok: false as const,
       status: response.status,
       message:
-        (data && "error" in data && data.error) ||
-        "The assistant could not generate an answer. Please try again.",
+        response.status === 401
+          ? "You are not signed in or your session has expired. Sign in again."
+          : message,
     };
   }
 
-  const answer = data && "answer" in data ? data.answer : "";
-
-  if (typeof answer !== "string" || !answer.trim()) {
+  if (!response.body) {
     return {
       ok: false as const,
       status: 500,
-      message: "The assistant returned an empty response.",
+      message: "Streaming is not supported by this response.",
     };
   }
 
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const finalEvent: {
+  answer: string;
+  citations: AnswerCitation[];
+  conversationId: number;
+}[] = [];
+  let streamError = "";
+
+  function processLine(line: string) {
+    if (!line.trim()) return;
+
+    const event = JSON.parse(line) as StreamEvent;
+
+   if (event.type === "token") {
+  console.log("[Frontend token]", event.token);
+  onToken(event.token);
+}else if (event.type === "done") {
+     finalEvent.push(event);
+    } else if (event.type === "error") {
+      streamError = event.error;
+    }
+  }
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+console.log(
+  "[Frontend stream]",
+  performance.now().toFixed(0) + "ms",
+  "Received bytes:",
+  value?.length ?? 0,
+);
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        processLine(line);
+      }
+
+      if (streamError) {
+        await reader.cancel().catch(() => {});
+        break;
+      }
+    }
+
+    buffer += decoder.decode();
+
+    if (!streamError && buffer.trim()) {
+      processLine(buffer);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  }
+
+  const completedEvent = finalEvent[0];
+
+if (streamError) {
   return {
-    ok: true as const,
-    answer: answer.trim(),
-    conversationId:
-      data && "conversationId" in data ? data.conversationId : conversationId,
-    citations:
-      data && "citations" in data && Array.isArray(data.citations)
-        ? data.citations
-        : [],
+    ok: false as const,
+    status: 500,
+    message: streamError,
   };
+}
+
+if (!completedEvent) {
+  return {
+    ok: false as const,
+    status: 500,
+    message: "The assistant stream ended before the answer was completed.",
+  };
+}
+
+return {
+  ok: true as const,
+  answer: completedEvent.answer,
+  citations: completedEvent.citations,
+  conversationId: completedEvent.conversationId,
+};
 }
 
 export function AssistantChat() {
@@ -251,90 +314,117 @@ export function AssistantChat() {
     }
   }
 
-  async function submitQuestion(question: string) {
-    const trimmed = question.trim();
+ 
+async function submitQuestion(question: string) {
+  const trimmed = question.trim();
 
-    if (!trimmed || loading) return;
+  if (!trimmed || loading) return;
 
-    setInput("");
-    setLoading(true);
-    setAuthRequired(false);
+  const assistantId = createId();
 
-    setMessages((current) => [
-      ...current,
-      {
-        id: createId(),
-        role: "user",
-        content: trimmed,
-      },
-    ]);
+  setInput("");
+  setLoading(true);
+  setAuthRequired(false);
 
-    try {
-      let activeConversationId = conversationId;
+  setMessages((current) => [
+    ...current,
+    {
+      id: createId(),
+      role: "user",
+      content: trimmed,
+    },
+    {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+    },
+  ]);
 
-      if (activeConversationId === null) {
-        activeConversationId = await createConversation(trimmed);
-      }
+  try {
+    let activeConversationId = conversationId;
 
-      const result = await askQuestion(trimmed, activeConversationId);
-
-      if (!result.ok) {
-        if (result.status === 401) setAuthRequired(true);
-
-        setMessages((current) => [
-          ...current,
-          {
-            id: createId(),
-            role: "assistant",
-            content: result.message,
-            isError: true,
-          },
-        ]);
-        return;
-      }
-
-      setConversationId(result.conversationId);
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId(),
-          role: "assistant",
-          content: result.answer,
-          citations: result.citations,
-          isUnavailable: looksLikeNoRelevantInformation(result.answer),
-        },
-      ]);
-
-      void loadConversations();
-    } catch (error) {
-      console.error("Submitting assistant question failed:", error);
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId(),
-          role: "assistant",
-          content: "Unable to reach the assistant. Please try again.",
-          isError: true,
-        },
-      ]);
-    } finally {
-      setLoading(false);
+    if (activeConversationId === null) {
+      activeConversationId = await createConversation(trimmed);
     }
+
+    const result = await askQuestion(
+      trimmed,
+      activeConversationId,
+     (token) => {
+  console.log("[React update requested]", token);
+
+  setMessages((current) =>
+    current.map((message) =>
+      message.id === assistantId
+        ? { ...message, content: message.content + token }
+        : message,
+    ),
+  );
+},
+    );
+
+    if (!result.ok) {
+      if (result.status === 401) {
+        setAuthRequired(true);
+      }
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: result.message,
+                citations: [],
+                isError: true,
+                isUnavailable: false,
+              }
+            : message,
+        ),
+      );
+
+      return;
+    }
+
+    setConversationId(result.conversationId);
+
+    // Replace streamed draft with the final validated answer.
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === assistantId
+          ? {
+              ...message,
+              content: result.answer,
+              citations: result.citations,
+              isError: false,
+              isUnavailable: looksLikeNoRelevantInformation(
+                result.answer,
+              ),
+            }
+          : message,
+      ),
+    );
+
+    void loadConversations();
+  } catch (error) {
+    console.error("Submitting assistant question failed:", error);
+
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === assistantId
+          ? {
+              ...message,
+              content: "Unable to reach the assistant. Please try again.",
+              citations: [],
+              isError: true,
+              isUnavailable: false,
+            }
+          : message,
+      ),
+    );
+  } finally {
+    setLoading(false);
   }
-
-  useEffect(() => {
-    const preset = searchParams.get("q");
-
-    if (!preset || autoAsked.current) return;
-
-    autoAsked.current = true;
-    void submitQuestion(preset);
-
-    // Intentionally run once for a preset query from the dashboard.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+}
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
