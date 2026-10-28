@@ -14,6 +14,52 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+
+
+type ApprovalStreamEvent =
+  | {
+      type: "progress";
+      stage: string;
+      message: string;
+      completed?: number;
+      total?: number;
+    }
+  | {
+      type: "done";
+      message: string;
+      document?: unknown;
+      chunkCount?: number;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
+function createApprovalStream() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array>;
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      controller = streamController;
+    },
+  });
+
+  return {
+    stream,
+    send(event: ApprovalStreamEvent) {
+      controller.enqueue(
+        encoder.encode(`${JSON.stringify(event)}\n`),
+      );
+    },
+    close() {
+      controller.close();
+    },
+  };
+}
+
+
+
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await requireRole(["OWNER"]);
@@ -145,22 +191,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     try {
       const buffer = await readDocumentFile(existingDocument.storagePath);
 
-      const processed = await processDocument(
-        buffer,
-        existingDocument.mimeType,
-        {
-          documentId,
-          organizationId: user.organizationId,
-          documentType: existingDocument.mimeType,
-          source: existingDocument.name,
-        },
-      );
+    
+const processed = await processDocument(
+  buffer,
+  existingDocument.mimeType,
+  {
+    documentId,
+    organizationId: user.organizationId,
+    documentType: existingDocument.mimeType,
+    source: existingDocument.name,
+  },
+  {},
+  (progress) => {
+    console.info("[Document processing]", {
+      documentId,
+      organizationId: user.organizationId,
+      ...progress,
+    });
+  },
+);
 
       if (processed.chunks.length === 0) {
         throw new Error("No extractable text was found in the document.");
       }
 
-      await saveDocumentChunks(processed.chunks);
+await saveDocumentChunks(processed.chunks, (progress) => {
+  console.info("[Document storage]", {
+    documentId,
+    organizationId: user.organizationId,
+    ...progress,
+  });
+});
+
 
       const completePlan = db.sql.public.document
         .update({ status: "PROCESSED" })

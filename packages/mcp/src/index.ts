@@ -1,8 +1,8 @@
 
 import { McpServer } from "@modelcontextprotocol/server";
-
+import type { LowStockProduct } from "@business-platform/business";
 export function createBusinessMcpServer(
-  getLowStockProducts: () => Promise<unknown[]>
+getLowStockProducts: () => Promise<LowStockProduct[]>
 ) {
   const server = new McpServer({
     name: "business-platform",

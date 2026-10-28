@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ASSISTANT_SUGGESTED_QUESTIONS } from "@/lib/assistant-questions";
 
 type ChatRole = "user" | "assistant";
@@ -40,6 +39,19 @@ type AskFailure = {
   error?: string;
 };
 
+type ProgressStage = "searching" | "generating" | "validating";
+
+type StreamEvent =
+  | { type: "progress"; stage: ProgressStage }
+  | { type: "token"; token: string }
+  | {
+      type: "done";
+      answer: string;
+      citations: AnswerCitation[];
+      conversationId: number;
+    }
+  | { type: "error"; error: string };
+
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -55,20 +67,11 @@ function looksLikeNoRelevantInformation(answer: string) {
   );
 }
 
-type StreamEvent =
-  | { type: "token"; token: string }
-  | {
-      type: "done";
-      answer: string;
-      citations: AnswerCitation[];
-      conversationId: number;
-    }
-  | { type: "error"; error: string };
-
 async function askQuestion(
   question: string,
   conversationId: number,
   onToken: (token: string) => void,
+  onProgress: (stage: ProgressStage) => void,
 ) {
   const response = await fetch("/api/assistant/ask", {
     method: "POST",
@@ -107,24 +110,36 @@ async function askQuestion(
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+
   let buffer = "";
-  const finalEvent: {
-  answer: string;
-  citations: AnswerCitation[];
-  conversationId: number;
-}[] = [];
+  let completedEvent:
+    | {
+        answer: string;
+        citations: AnswerCitation[];
+        conversationId: number;
+      }
+    | undefined;
+
   let streamError = "";
 
   function processLine(line: string) {
     if (!line.trim()) return;
 
-    const event = JSON.parse(line) as StreamEvent;
+    let event: StreamEvent;
 
-   if (event.type === "token") {
-  console.log("[Frontend token]", event.token);
-  onToken(event.token);
-}else if (event.type === "done") {
-     finalEvent.push(event);
+    try {
+      event = JSON.parse(line) as StreamEvent;
+    } catch {
+      streamError = "The assistant returned an invalid streaming response.";
+      return;
+    }
+
+    if (event.type === "progress") {
+      onProgress(event.stage);
+    } else if (event.type === "token") {
+      onToken(event.token);
+    } else if (event.type === "done") {
+      completedEvent = event;
     } else if (event.type === "error") {
       streamError = event.error;
     }
@@ -137,12 +152,7 @@ async function askQuestion(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-console.log(
-  "[Frontend stream]",
-  performance.now().toFixed(0) + "ms",
-  "Received bytes:",
-  value?.length ?? 0,
-);
+
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
@@ -166,34 +176,33 @@ console.log(
     throw error;
   }
 
-  const completedEvent = finalEvent[0];
+  if (streamError) {
+    return {
+      ok: false as const,
+      status: 500,
+      message: streamError,
+    };
+  }
 
-if (streamError) {
+  if (!completedEvent) {
+    return {
+      ok: false as const,
+      status: 500,
+      message: "The assistant stream ended before the answer was completed.",
+    };
+  }
+
   return {
-    ok: false as const,
-    status: 500,
-    message: streamError,
+    ok: true as const,
+    answer: completedEvent.answer,
+    citations: completedEvent.citations,
+    conversationId: completedEvent.conversationId,
   };
-}
-
-if (!completedEvent) {
-  return {
-    ok: false as const,
-    status: 500,
-    message: "The assistant stream ended before the answer was completed.",
-  };
-}
-
-return {
-  ok: true as const,
-  answer: completedEvent.answer,
-  citations: completedEvent.citations,
-  conversationId: completedEvent.conversationId,
-};
 }
 
 export function AssistantChat() {
-  const searchParams = useSearchParams();
+  const [progressStage, setProgressStage] =
+    useState<ProgressStage | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -205,11 +214,10 @@ export function AssistantChat() {
   const [historyError, setHistoryError] = useState("");
 
   const endRef = useRef<HTMLDivElement | null>(null);
-  const autoAsked = useRef(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, progressStage]);
 
   async function loadConversations() {
     setHistoryLoading(true);
@@ -270,6 +278,7 @@ export function AssistantChat() {
     setMessages([]);
     setInput("");
     setAuthRequired(false);
+    setProgressStage(null);
   }
 
   async function openConversation(id: number) {
@@ -290,6 +299,7 @@ export function AssistantChat() {
       const data = await response.json();
 
       setConversationId(data.conversation.id);
+
       setMessages(
         (data.messages ?? []).map(
           (message: {
@@ -314,66 +324,105 @@ export function AssistantChat() {
     }
   }
 
- 
-async function submitQuestion(question: string) {
-  const trimmed = question.trim();
+  async function submitQuestion(question: string) {
+    const trimmed = question.trim();
 
-  if (!trimmed || loading) return;
+    if (!trimmed || loading) return;
 
-  const assistantId = createId();
+    const assistantId = createId();
 
-  setInput("");
-  setLoading(true);
-  setAuthRequired(false);
+    setInput("");
+    setLoading(true);
+    setProgressStage("searching");
+    setAuthRequired(false);
 
-  setMessages((current) => [
-    ...current,
-    {
-      id: createId(),
-      role: "user",
-      content: trimmed,
-    },
-    {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-    },
-  ]);
+    setMessages((current) => [
+      ...current,
+      {
+        id: createId(),
+        role: "user",
+        content: trimmed,
+      },
+      {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+      },
+    ]);
 
-  try {
-    let activeConversationId = conversationId;
+    try {
+      let activeConversationId = conversationId;
 
-    if (activeConversationId === null) {
-      activeConversationId = await createConversation(trimmed);
-    }
-
-    const result = await askQuestion(
-      trimmed,
-      activeConversationId,
-     (token) => {
-  console.log("[React update requested]", token);
-
-  setMessages((current) =>
-    current.map((message) =>
-      message.id === assistantId
-        ? { ...message, content: message.content + token }
-        : message,
-    ),
-  );
-},
-    );
-
-    if (!result.ok) {
-      if (result.status === 401) {
-        setAuthRequired(true);
+      if (activeConversationId === null) {
+        activeConversationId = await createConversation(trimmed);
       }
+
+      const result = await askQuestion(
+        trimmed,
+        activeConversationId,
+        (token) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: message.content + token }
+                : message,
+            ),
+          );
+        },
+        (stage) => {
+          setProgressStage(stage);
+        },
+      );
+
+      if (!result.ok) {
+        if (result.status === 401) {
+          setAuthRequired(true);
+        }
+
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content: result.message,
+                  citations: [],
+                  isError: true,
+                  isUnavailable: false,
+                }
+              : message,
+          ),
+        );
+
+        return;
+      }
+
+      setConversationId(result.conversationId);
+
+      // Replace the streamed draft with the final validated answer.
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: result.answer,
+                citations: result.citations,
+                isError: false,
+                isUnavailable: looksLikeNoRelevantInformation(result.answer),
+              }
+            : message,
+        ),
+      );
+
+      void loadConversations();
+    } catch (error) {
+      console.error("Submitting assistant question failed:", error);
 
       setMessages((current) =>
         current.map((message) =>
           message.id === assistantId
             ? {
                 ...message,
-                content: result.message,
+                content: "Unable to reach the assistant. Please try again.",
                 citations: [],
                 isError: true,
                 isUnavailable: false,
@@ -381,50 +430,11 @@ async function submitQuestion(question: string) {
             : message,
         ),
       );
-
-      return;
+    } finally {
+      setLoading(false);
+      setProgressStage(null);
     }
-
-    setConversationId(result.conversationId);
-
-    // Replace streamed draft with the final validated answer.
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === assistantId
-          ? {
-              ...message,
-              content: result.answer,
-              citations: result.citations,
-              isError: false,
-              isUnavailable: looksLikeNoRelevantInformation(
-                result.answer,
-              ),
-            }
-          : message,
-      ),
-    );
-
-    void loadConversations();
-  } catch (error) {
-    console.error("Submitting assistant question failed:", error);
-
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === assistantId
-          ? {
-              ...message,
-              content: "Unable to reach the assistant. Please try again.",
-              citations: [],
-              isError: true,
-              isUnavailable: false,
-            }
-          : message,
-      ),
-    );
-  } finally {
-    setLoading(false);
   }
-}
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -438,12 +448,24 @@ async function submitQuestion(question: string) {
     }
   }
 
+  const progressMessage =
+    progressStage === "searching"
+      ? "Searching your organization's documents..."
+      : progressStage === "generating"
+        ? "Generating an answer..."
+        : progressStage === "validating"
+          ? "Checking the answer against available information..."
+          : "Preparing your answer...";
+
   return (
     <div className="flex h-[calc(100vh-3.75rem)] min-h-[32rem] flex-col">
       <div className="border-b border-slate-200 bg-white px-4 py-4 md:px-8">
-        <h2 className="text-lg font-semibold text-slate-900">AI Assistant</h2>
+        <h2 className="text-lg font-semibold text-slate-900">
+          AI Assistant
+        </h2>
+
         <p className="mt-1 text-sm text-slate-500">
-          Answers come from your organization&apos;s processed documents. If
+          Answers come from your organization's processed documents. If
           documents have not been uploaded or indexed yet, the assistant may
           not have relevant information.
         </p>
@@ -465,9 +487,13 @@ async function submitQuestion(question: string) {
           </h3>
 
           {historyLoading ? (
-            <p className="px-1 text-sm text-slate-500">Loading history...</p>
+            <p className="px-1 text-sm text-slate-500">
+              Loading history...
+            </p>
           ) : conversations.length === 0 ? (
-            <p className="px-1 text-sm text-slate-500">No saved chats yet.</p>
+            <p className="px-1 text-sm text-slate-500">
+              No saved chats yet.
+            </p>
           ) : (
             <ul className="space-y-1">
               {conversations.map((conversation) => (
@@ -498,14 +524,21 @@ async function submitQuestion(question: string) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8" aria-live="polite">
+          <div
+            className="flex-1 overflow-y-auto px-4 py-6 md:px-8"
+            aria-live="polite"
+          >
             {messages.length === 0 && !loading ? (
               <div className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
-                <p className="font-medium text-slate-800">Start a conversation</p>
+                <p className="font-medium text-slate-800">
+                  Start a conversation
+                </p>
+
                 <p className="mt-2 text-sm text-slate-500">
                   Ask a question about company policies, leave, or the contents
                   of your knowledge documents.
                 </p>
+
                 <ul className="mt-5 grid gap-2 text-left">
                   {ASSISTANT_SUGGESTED_QUESTIONS.map((question) => (
                     <li key={question}>
@@ -526,7 +559,9 @@ async function submitQuestion(question: string) {
                   <div
                     key={message.id}
                     className={`flex ${
-                      message.role === "user" ? "justify-end" : "justify-start"
+                      message.role === "user"
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
                     <div
@@ -544,7 +579,9 @@ async function submitQuestion(question: string) {
                         {message.role === "user" ? "You" : "Assistant"}
                       </p>
 
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap">
+                        {message.content}
+                      </p>
 
                       {message.role === "assistant" &&
                       message.citations?.length ? (
@@ -552,6 +589,7 @@ async function submitQuestion(question: string) {
                           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Sources
                           </p>
+
                           <ul className="space-y-2">
                             {message.citations.map((citation, index) => (
                               <li
@@ -561,10 +599,12 @@ async function submitQuestion(question: string) {
                                 <p className="font-medium text-slate-800">
                                   {citation.source}
                                 </p>
+
                                 <p className="mt-1">
                                   Document #{citation.documentId} · Chunk{" "}
                                   {citation.chunkIndex}
                                 </p>
+
                                 <p className="mt-2 whitespace-pre-wrap">
                                   {citation.content}
                                 </p>
@@ -590,10 +630,11 @@ async function submitQuestion(question: string) {
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm"
                       role="status"
                     >
-                      The assistant is reviewing your documents...
+                      {progressMessage}
                     </div>
                   </div>
                 ) : null}
+
                 <div ref={endRef} />
               </div>
             )}
@@ -633,6 +674,7 @@ async function submitQuestion(question: string) {
               <label htmlFor="assistant-question" className="sr-only">
                 Message to the AI assistant
               </label>
+
               <textarea
                 id="assistant-question"
                 rows={2}
@@ -643,6 +685,7 @@ async function submitQuestion(question: string) {
                 placeholder="Ask a question about your business documents..."
                 className="min-h-[3rem] w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-700 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-50"
               />
+
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
@@ -651,6 +694,7 @@ async function submitQuestion(question: string) {
                 Send
               </button>
             </form>
+
             <p className="mx-auto mt-2 max-w-3xl text-xs text-slate-500">
               Press Enter to send. Shift+Enter adds a new line.
             </p>

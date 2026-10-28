@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@business-platform/auth/session";
-import { streamAnswerQuestion } from "@business-platform/rag";
+import {
+  streamAnswerQuestion,
+  type AnswerProgressStage,
+} from "@business-platform/rag";
 import { db, getDbRuntime } from "@business-platform/database";
 
 export const runtime = "nodejs";
-
 type StreamEvent =
+  | { type: "progress"; stage: AnswerProgressStage }
   | { type: "token"; token: string }
   | {
       type: "done";
@@ -133,12 +136,16 @@ export async function POST(request: Request) {
 
         try {
           const result = await streamAnswerQuestion(
-            user.organizationId,
-            question,
-            (token) => {
-              sendEvent({ type: "token", token });
-            },
-          );
+  user.organizationId,
+  question,
+  (token) => {
+    sendEvent({ type: "token", token });
+  },
+  5,
+  (stage) => {
+    sendEvent({ type: "progress", stage });
+  },
+);
 
           // Do not attempt further writes if the stream is unavailable.
           if (!streamOpen) return;

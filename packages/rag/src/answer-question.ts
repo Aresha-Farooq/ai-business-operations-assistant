@@ -6,6 +6,15 @@ import {
 } from "../../ai/src/generate-answer.js";
 import { validateAnswer } from "../../ai/src/validate-answer.js";
 
+export type AnswerProgressStage =
+  | "searching"
+  | "generating"
+  | "validating";
+
+export type AnswerProgressCallback = (
+  stage: AnswerProgressStage,
+) => void;
+
 export type AnswerCitation = {
   documentId: number;
   chunkIndex: number;
@@ -92,6 +101,7 @@ export async function streamAnswerQuestion(
   question: string,
   onToken: (token: string) => void,
   limit: number = 5,
+  onProgress?: AnswerProgressCallback,
 ): Promise<AnswerQuestionResult> {
   if (!question.trim()) {
     throw new Error("Question cannot be empty");
@@ -99,7 +109,9 @@ export async function streamAnswerQuestion(
 
   const startedAt = Date.now();
 
+  // Stage 1: Retrieve relevant company document chunks.
   console.log("[RAG stream] Searching relevant chunks");
+  onProgress?.("searching");
 
   const chunks = await searchSimilarChunks(
     organizationId,
@@ -110,31 +122,39 @@ export async function streamAnswerQuestion(
   const context = chunks.map((chunk) => String(chunk.content));
 
   console.log(
-    `[RAG stream] Retrieval completed in ${Date.now() - startedAt}ms`,
+    `[RAG stream] Retrieval completed in ${
+      Date.now() - startedAt
+    }ms`,
   );
 
+  // Stage 2: Generate the answer progressively.
   let answer = "";
   let tokenCount = 0;
 
   console.log("[RAG stream] Starting Gemini generation");
+  onProgress?.("generating");
 
   for await (const token of generateAnswerStream(question, context)) {
     answer += token;
     tokenCount++;
 
-    // Forward every generated chunk immediately to the API route.
+    // Forward each generated chunk to the API route.
     onToken(token);
   }
 
   console.log(
-    `[RAG stream] Generation completed in ${Date.now() - startedAt}ms; chunks received: ${tokenCount}`,
+    `[RAG stream] Generation completed in ${
+      Date.now() - startedAt
+    }ms; chunks received: ${tokenCount}`,
   );
 
   if (!answer.trim()) {
     throw new Error("The AI generated an empty answer.");
   }
 
+  // Stage 3: Validate the generated answer against retrieved context.
   console.time("RAG stream answer validation");
+  onProgress?.("validating");
 
   const validation = await validateAnswer(
     question,

@@ -9,12 +9,55 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 import { postgresPool } from "./postgres.js";
 
+
+export interface ChunkStorageProgress {
+  stage: "embedding" | "storing" | "completed";
+  message: string;
+  completed: number;
+  total: number;
+}
+
+export type ChunkStorageProgressCallback = (
+  progress: ChunkStorageProgress,
+) => void;
+
 export async function saveDocumentChunks(
   chunks: ProcessedChunk[],
+  onProgress?: ChunkStorageProgressCallback,
 ): Promise<void> {
-  for (const chunk of chunks) {
+  const total = chunks.length;
+
+  for (let index = 0; index < total; index++) {
+    const chunk = chunks[index];
+
+    if (!chunk) {
+      throw new Error(`Missing chunk at index ${index}.`);
+    }
+
+    onProgress?.({
+      stage: "embedding",
+      message: `Generating embedding for chunk ${index + 1} of ${total}`,
+      completed: index,
+      total,
+    });
+
     const embedding = await generateEmbedding(chunk.text);
+
+    if (
+      !embedding.length ||
+      embedding.some((value) => !Number.isFinite(value))
+    ) {
+      throw new Error(`Invalid embedding for chunk ${index + 1}.`);
+    }
+
     const vectorString = `[${embedding.join(",")}]`;
+
+    onProgress?.({
+      stage: "storing",
+      message: `Saving chunk ${index + 1} of ${total}`,
+      completed: index,
+      total,
+    });
 
     await postgresPool.query(
       `INSERT INTO public."documentChunk"
@@ -42,8 +85,23 @@ export async function saveDocumentChunks(
         vectorString,
       ],
     );
+
+    onProgress?.({
+      stage: "storing",
+      message: `Saved chunk ${index + 1} of ${total}`,
+      completed: index + 1,
+      total,
+    });
   }
+
+  onProgress?.({
+    stage: "completed",
+    message: "All chunks and embeddings saved",
+    completed: total,
+    total,
+  });
 }
+
 
 export async function getDocumentChunks(
   organizationId: number,

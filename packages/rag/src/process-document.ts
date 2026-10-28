@@ -14,6 +14,22 @@ export interface ChunkContext {
   source: string;
 }
 
+export type DocumentProcessingStage =
+  | "extracting"
+  | "chunking"
+  | "completed";
+
+export interface DocumentProcessingProgress {
+  stage: DocumentProcessingStage;
+  message: string;
+  completed?: number;
+  total?: number;
+}
+
+export type DocumentProgressCallback = (
+  progress: DocumentProcessingProgress,
+) => void;
+
 export interface ProcessedChunk extends TextChunk {
   documentId: number;
   organizationId: number;
@@ -32,12 +48,23 @@ export async function processDocument(
   mimeType: string,
   context: ChunkContext,
   chunkOptions: ChunkOptions = {},
+  onProgress?: DocumentProgressCallback,
 ): Promise<ProcessedDocument> {
+  onProgress?.({
+    stage: "extracting",
+    message: "Extracting document text",
+  });
+
   const extracted = await extractDocument(
     buffer,
     mimeType,
     context.source,
   );
+
+  onProgress?.({
+    stage: "chunking",
+    message: "Splitting extracted text into chunks",
+  });
 
   const textChunks = splitTextIntoChunks(
     extracted.text,
@@ -52,6 +79,13 @@ export async function processDocument(
     source: context.source,
     processedAt: new Date().toISOString(),
   }));
+
+  onProgress?.({
+    stage: "completed",
+    message: "Text extraction and chunking completed",
+    completed: chunks.length,
+    total: chunks.length,
+  });
 
   return { extracted, chunks };
 }

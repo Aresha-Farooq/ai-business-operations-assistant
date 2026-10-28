@@ -1,6 +1,13 @@
 import { db, getDbRuntime } from "@business-platform/database";
 import { requireCurrentUser } from "@business-platform/auth/session";
-
+export type LowStockProduct = {
+  id: number;
+  name: string;
+  sku: string;
+  stockQuantity: number;
+  minimumStock: number;
+  organizationId: number;
+};
 export async function getLowStockProducts() {
 const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
