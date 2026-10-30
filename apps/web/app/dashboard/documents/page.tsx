@@ -1,4 +1,5 @@
-﻿"use client";
+﻿
+"use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -19,6 +20,25 @@ type ApiResponse = {
   message?: string;
   error?: string;
 };
+
+type ApprovalStreamEvent =
+  | {
+      type: "progress";
+      stage: string;
+      message: string;
+      completed?: number;
+      total?: number;
+    }
+  | {
+      type: "done";
+      message: string;
+      document?: DocumentItem;
+      chunkCount?: number;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
 
 const statusStyles: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -50,6 +70,7 @@ function formatSize(bytes: number) {
 
 function formatDate(value: string) {
   const date = new Date(value);
+
   return Number.isNaN(date.getTime())
     ? "—"
     : date.toLocaleDateString(undefined, {
@@ -67,6 +88,15 @@ export default function DocumentsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  // Correct location: hooks belong inside the component.
+  const [processingProgress, setProcessingProgress] = useState<{
+    documentId: number;
+    stage: string;
+    message: string;
+    completed?: number;
+    total?: number;
+  } | null>(null);
+
   const loadDocuments = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -75,6 +105,7 @@ export default function DocumentsPage() {
       const response = await fetch("/api/documents", {
         cache: "no-store",
       });
+
       const data = (await response.json()) as ApiResponse;
 
       if (!response.ok) {
@@ -116,6 +147,7 @@ export default function DocumentsPage() {
         method: "POST",
         body: formData,
       });
+
       const data = (await response.json()) as ApiResponse;
 
       if (!response.ok) {
@@ -141,6 +173,7 @@ export default function DocumentsPage() {
     setActionId(documentId);
     setError("");
     setMessage("");
+    setProcessingProgress(null);
 
     try {
       const response = await fetch(
@@ -152,25 +185,103 @@ export default function DocumentsPage() {
         }
       );
 
-      const data = (await response.json()) as ApiResponse;
+      const contentType = response.headers.get("content-type") ?? "";
 
-      if (!response.ok) {
-        throw new Error(data.error ?? "Document review failed.");
+      // Handle ordinary JSON responses, including rejection and API errors.
+      if (!contentType.includes("application/x-ndjson")) {
+        const data = (await response.json()) as ApiResponse;
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Document review failed.");
+        }
+
+        setMessage(
+          data.message ??
+            (approvalStatus === "APPROVED"
+              ? "Document approved."
+              : "Document rejected.")
+        );
+
+        await loadDocuments();
+        return;
       }
 
-      setMessage(
-        data.message ??
-          (approvalStatus === "APPROVED"
-            ? "Document approved."
-            : "Document rejected.")
-      );
+      if (!response.ok) {
+        throw new Error("Document review failed.");
+      }
+
+      if (!response.body) {
+        throw new Error("The server did not provide a progress stream.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let completed = false;
+
+      async function handleEvent(event: ApprovalStreamEvent) {
+        if (event.type === "progress") {
+          setProcessingProgress({
+            documentId,
+            stage: event.stage,
+            message: event.message,
+            completed: event.completed,
+            total: event.total,
+          });
+        } else if (event.type === "done") {
+          completed = true;
+          setMessage(event.message);
+          setProcessingProgress(null);
+        } else {
+          throw new Error(event.message);
+        }
+      }
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) {
+            buffer += decoder.decode();
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            const event = JSON.parse(line) as ApprovalStreamEvent;
+            await handleEvent(event);
+          }
+        }
+
+        // Process a final event if the stream doesn't end with a newline.
+        if (buffer.trim()) {
+          const event = JSON.parse(buffer) as ApprovalStreamEvent;
+          await handleEvent(event);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (!completed) {
+        throw new Error(
+          "The processing stream ended before completion was confirmed."
+        );
+      }
 
       await loadDocuments();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Document review failed."
       );
+      await loadDocuments();
     } finally {
+      setProcessingProgress(null);
       setActionId(null);
     }
   }
@@ -289,6 +400,7 @@ export default function DocumentsPage() {
               Review approval and processing status for each document.
             </p>
           </div>
+
           <button
             type="button"
             onClick={() => void loadDocuments()}
@@ -322,9 +434,12 @@ export default function DocumentsPage() {
                   <th className="px-4 py-4 font-semibold">Uploaded</th>
                   <th className="px-4 py-4 font-semibold">Approval</th>
                   <th className="px-4 py-4 font-semibold">Processing</th>
-                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
+                  <th className="px-6 py-4 text-right font-semibold">
+                    Actions
+                  </th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-100">
                 {documents.map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50/70">
@@ -336,18 +451,42 @@ export default function DocumentsPage() {
                         {doc.mimeType}
                       </p>
                     </td>
+
                     <td className="whitespace-nowrap px-4 py-4 text-slate-600">
                       {formatSize(doc.sizeBytes)}
                     </td>
+
                     <td className="whitespace-nowrap px-4 py-4 text-slate-600">
                       {formatDate(doc.createdAt)}
                     </td>
+
                     <td className="px-4 py-4">
                       <StatusBadge value={doc.approvalStatus} />
                     </td>
+
                     <td className="px-4 py-4">
                       <StatusBadge value={doc.status} />
+
+                      {processingProgress?.documentId === doc.id && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="mt-2 rounded-md bg-blue-50 p-3 text-sm text-blue-800"
+                        >
+                          <p className="font-medium">
+                            {processingProgress.message}
+                          </p>
+
+                          {processingProgress.total !== undefined && (
+                            <p className="mt-1">
+                              Progress: {processingProgress.completed ?? 0} /{" "}
+                              {processingProgress.total}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </td>
+
                     <td className="px-6 py-4">
                       {doc.approvalStatus === "PENDING" &&
                       doc.status === "UPLOADED" ? (
@@ -362,6 +501,7 @@ export default function DocumentsPage() {
                           >
                             {actionId === doc.id ? "Working..." : "Approve"}
                           </button>
+
                           <button
                             type="button"
                             disabled={actionId === doc.id}

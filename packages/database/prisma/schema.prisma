@@ -30,7 +30,7 @@ model Organization {
   name      String
 slug String? @unique
 conversations Conversation[]
-
+invoices Invoice[]
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
   tickets Ticket[]
@@ -174,6 +174,13 @@ enum PaymentMethod {
   EASYPAISA
 }
 
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
 model Order {
   id             Int         @id @default(autoincrement())
   customerId     Int
@@ -181,6 +188,7 @@ model Order {
   status         OrderStatus @default(PENDING)
   shippingStatus ShippingStatus @default(NOT_SHIPPED)
   totalAmount    Float
+  invoice Invoice?
 payments Payment[]
   customer       Customer    @relation(
     fields: [customerId],
@@ -195,6 +203,34 @@ payments Payment[]
   items          OrderItem[]
   createdAt      TimestamptzString @default(now())
   updatedAt      temporal.updatedAtString()
+}
+model Invoice {
+  id             Int           @id @default(autoincrement())
+  invoiceNumber  String
+  organizationId Int
+  orderId        Int           @unique
+  amount         Float
+  currency       String        @default("PKR")
+  issueDate      TimestamptzString @default(now())
+  dueDate        TimestamptzString
+  status         InvoiceStatus @default(DRAFT)
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  order Order @relation(
+    fields: [orderId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@unique([organizationId, invoiceNumber])
+
+  @@index([organizationId, status, dueDate])
 }
 
 model OrderItem {
