@@ -1,5 +1,8 @@
-﻿import { createMcpHandler } from "@modelcontextprotocol/server";
+﻿
+import { createMcpHandler } from "@modelcontextprotocol/server";
 import { getCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth";
+
 import {
   getCustomer,
   getLowStockProducts,
@@ -10,6 +13,7 @@ import {
   getOverdueInvoices,
   getInvoice,
 } from "@business-platform/business";
+
 import { createBusinessMcpServer } from "@business-platform/mcp";
 
 export const runtime = "nodejs";
@@ -17,43 +21,42 @@ export const runtime = "nodejs";
 const handler = createMcpHandler(() =>
   createBusinessMcpServer(
     async () => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("inventory:read");
       return getLowStockProducts();
     },
+
     async (customerId) => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("customers:read");
       return getCustomer(customerId);
     },
+
     async (searchTerm) => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("customers:read");
       return searchCustomers(searchTerm);
     },
+
     async (orderId) => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("orders:read");
       return getOrderById(orderId);
     },
+
     async () => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("inventory:read");
       return getInventoryMovements();
     },
+
     async () => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("sales:read");
       return getSalesReport();
     },
+
     async () => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("invoices:read");
       return getOverdueInvoices();
     },
+
     async (invoiceId) => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated.");
+      await requirePermission("invoices:read");
       return getInvoice(invoiceId);
     }
   )
