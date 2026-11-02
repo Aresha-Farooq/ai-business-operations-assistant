@@ -23,7 +23,11 @@ enum DocumentApprovalStatus {
   APPROVED
   REJECTED
 }
-
+enum AuditStatus {
+  SUCCESS
+  FAILURE
+  DENIED
+}
 
 model Organization {
   id        Int      @id @default(autoincrement())
@@ -34,6 +38,7 @@ invoices Invoice[]
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
   tickets Ticket[]
+  auditLogs AuditLog[]
 documents Document[]
   inventoryMovements InventoryMovement[]
   users             User[]
@@ -49,6 +54,7 @@ model User {
   passwordHash   String
   organizationId Int
   role           UserRole @default(STAFF)
+  auditLogs AuditLog[]
 conversations Conversation[]
   organization Organization @relation(
     fields: [organizationId],
@@ -378,4 +384,35 @@ model Message {
   createdAt TimestamptzString @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+
+model AuditLog {
+  id             Int         @id @default(autoincrement())
+  organizationId Int
+  userId         Int?
+
+  action         String
+  toolName       String?
+  status         AuditStatus
+
+  errorMessage   String?
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  user User? @relation(
+    fields: [userId],
+    references: [id],
+    onDelete: SetNull
+  )
+
+  createdAt TimestamptzString @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, userId])
+  @@index([organizationId, toolName])
 }

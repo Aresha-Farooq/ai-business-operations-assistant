@@ -15,7 +15,9 @@ async function main() {
 
   const users = await runtime.query(query);
 
-  const existing = users.find((user) => user.email === email);
+  const existing = users.find(
+  (user: { email: string }) => user.email === email
+);
 
   if (existing) {
     console.log("STAFF test account already exists:", existing);

@@ -2,6 +2,7 @@
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { getCurrentUser } from "@business-platform/auth/session";
 import { requirePermission } from "@business-platform/auth";
+import { createAuditLog } from "@business-platform/database";
 
 import {
   getCustomer,
@@ -18,47 +19,103 @@ import { createBusinessMcpServer } from "@business-platform/mcp";
 
 export const runtime = "nodejs";
 
+type Permission =
+  | "customers:read"
+  | "orders:read"
+  | "inventory:read"
+  | "sales:read"
+  | "invoices:read";
+
+async function audit(
+  user: { userId: number; organizationId: number },
+  toolName: string,
+  status: "SUCCESS" | "FAILURE" | "DENIED",
+  errorMessage?: string
+) {
+  try {
+    await createAuditLog({
+      organizationId: user.organizationId,
+      userId: user.userId,
+      action: `MCP_${toolName}`,
+      toolName,
+      status,
+      errorMessage,
+    });
+  } catch (error) {
+    // Audit failure must not break the MCP operation.
+    console.error("Audit logging failed:", error);
+  }
+}
+
+async function executeTool<T>(
+  toolName: string,
+  permission: Permission,
+  operation: () => Promise<T>
+): Promise<T> {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  try {
+    await requirePermission(permission);
+  } catch (error) {
+    await audit(user, toolName, "DENIED", "Permission denied.");
+    throw error;
+  }
+
+  try {
+    const result = await operation();
+    await audit(user, toolName, "SUCCESS");
+    return result;
+  } catch (error) {
+    await audit(user, toolName, "FAILURE", "Tool execution failed.");
+    throw error;
+  }
+}
+
 const handler = createMcpHandler(() =>
   createBusinessMcpServer(
-    async () => {
-      await requirePermission("inventory:read");
-      return getLowStockProducts();
-    },
+    () =>
+      executeTool("get_low_stock_products", "inventory:read", () =>
+        getLowStockProducts()
+      ),
 
-    async (customerId) => {
-      await requirePermission("customers:read");
-      return getCustomer(customerId);
-    },
+    (customerId) =>
+      executeTool("get_customer", "customers:read", () =>
+        getCustomer(customerId)
+      ),
 
-    async (searchTerm) => {
-      await requirePermission("customers:read");
-      return searchCustomers(searchTerm);
-    },
+    (searchTerm) =>
+      executeTool("search_customers", "customers:read", () =>
+        searchCustomers(searchTerm)
+      ),
 
-    async (orderId) => {
-      await requirePermission("orders:read");
-      return getOrderById(orderId);
-    },
+    (orderId) =>
+      executeTool("get_order", "orders:read", () =>
+        getOrderById(orderId)
+      ),
 
-    async () => {
-      await requirePermission("inventory:read");
-      return getInventoryMovements();
-    },
+    () =>
+      executeTool("get_inventory", "inventory:read", () =>
+        getInventoryMovements()
+      ),
 
-    async () => {
-      await requirePermission("sales:read");
-      return getSalesReport();
-    },
+    () =>
+      executeTool("get_sales_report", "sales:read", () =>
+        getSalesReport()
+      ),
 
-    async () => {
-      await requirePermission("invoices:read");
-      return getOverdueInvoices();
-    },
+    () =>
+      executeTool("get_overdue_invoices", "invoices:read", () =>
+        getOverdueInvoices()
+      ),
 
-    async (invoiceId) => {
-      await requirePermission("invoices:read");
-      return getInvoice(invoiceId);
-    }
+    (invoiceId) =>
+      executeTool("get_invoice", "invoices:read", () =>
+        getInvoice(invoiceId)
+      )
   )
 );
 
