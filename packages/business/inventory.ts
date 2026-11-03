@@ -1,4 +1,8 @@
-import { db } from "@business-platform/database";
+
+import {
+  createAuditLog,
+  db,
+} from "@business-platform/database";
 import { requireCurrentUser } from "@business-platform/auth/session";
 
 type ChangeStockInput = {
@@ -35,22 +39,11 @@ export async function applyStockMovement(
     .build();
 
   const products = await tx.query(productPlan);
-
   const product = products[0];
 
   if (!product) {
     throw new Error("Product not found.");
   }
-
-  /*
-   * Determine whether stock should increase or decrease.
-   *
-   * PURCHASE  → increase
-   * RETURN    → increase
-   * SALE      → decrease
-   * DAMAGE    → decrease
-   * ADJUSTMENT → depends on adjustmentDirection
-   */
 
   const stockDecreaseTypes = ["SALE", "DAMAGE"];
 
@@ -101,7 +94,6 @@ export async function applyStockMovement(
     .build();
 
   const updatedProducts = await tx.query(updateProductPlan);
-
   const updatedProduct = updatedProducts[0];
 
   if (!updatedProduct) {
@@ -129,7 +121,6 @@ export async function applyStockMovement(
     .build();
 
   const movements = await tx.query(movementPlan);
-
   const movement = movements[0];
 
   if (!movement) {
@@ -150,6 +141,25 @@ export async function changeStock(input: ChangeStockInput) {
       tx,
       input,
       user.organizationId
+    );
+
+    const auditActions = {
+      PURCHASE: "STOCK_PURCHASED",
+      SALE: "STOCK_SOLD",
+      ADJUSTMENT: "STOCK_ADJUSTED",
+      RETURN: "STOCK_RETURNED",
+      DAMAGE: "STOCK_DAMAGED",
+    } as const;
+
+    await createAuditLog(
+      {
+        organizationId: user.organizationId,
+        userId: user.userId,
+        action: auditActions[input.type],
+        status: "SUCCESS",
+        toolName: null,
+      },
+      tx
     );
 
     return movement;

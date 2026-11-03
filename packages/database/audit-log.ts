@@ -1,4 +1,3 @@
-
 import { db, getDbRuntime } from "./prisma/db.js";
 
 export type AuditStatus = "SUCCESS" | "FAILURE" | "DENIED";
@@ -12,9 +11,14 @@ export interface CreateAuditLogInput {
   errorMessage?: string | null;
 }
 
-export async function createAuditLog(input: CreateAuditLogInput) {
-  const runtime = await getDbRuntime();
+type AuditTransaction = Parameters<
+  Parameters<typeof db.transaction>[0]
+>[0];
 
+export async function createAuditLog(
+  input: CreateAuditLogInput,
+  tx?: AuditTransaction
+) {
   const query = db.sql.public.auditLog
     .insert([
       {
@@ -29,7 +33,11 @@ export async function createAuditLog(input: CreateAuditLogInput) {
     .returning("id", "action", "status", "createdAt")
     .build();
 
-  const result = await runtime.query(query);
+  if (tx) {
+    return tx.query(query);
+  }
 
-  return result;
+  const runtime = await getDbRuntime();
+
+  return runtime.query(query);
 }

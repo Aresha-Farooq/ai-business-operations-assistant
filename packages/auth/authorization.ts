@@ -12,21 +12,24 @@ export type Permission =
   | "sales:read"
   | "employees:manage"
   | "settings:manage"
+  | "invoices:read"
+|  "audit:read"
   | "invoices:read";
 
 const rolePermissions: Record<UserRole, Permission[]> = {
-  OWNER: [
-    "customers:read",
-    "customers:manage",
-    "orders:read",
-    "orders:manage",
-    "inventory:read",
-    "inventory:manage",
-    "sales:read",
-    "employees:manage",
-    "settings:manage",
-    "invoices:read",
-  ],
+ OWNER: [
+  "customers:read",
+  "customers:manage",
+  "orders:read",
+  "orders:manage",
+  "inventory:read",
+  "inventory:manage",
+  "sales:read",
+  "employees:manage",
+  "settings:manage",
+  "invoices:read",
+  "audit:read",
+],
 
   MANAGER: [
     "customers:read",

@@ -10,4 +10,5 @@ export { getInventoryMovements } from "./inventory-query";
 export { getSalesReport } from "./sales-report";
 export { getOverdueInvoices } from "./overdue-invoices";
 export { getInvoice } from "./get-invoice";
-
+export { getAuditLogs } from "./audit-logs";
+export type { GetAuditLogsInput } from "./audit-logs";

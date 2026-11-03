@@ -1,9 +1,41 @@
-import { db, getDbRuntime } from "@business-platform/database";
+
+import {
+  db,
+  getDbRuntime,
+  createAuditLog,
+} from "@business-platform/database";
+
 import { requireCurrentUser } from "@business-platform/auth/session";
 
-export async function getCustomers() {
- const user = await requireCurrentUser();
+type UpdateCustomerInput = {
+  name?: string;
+  email?: string;
+  phone?: string;
+};
 
+async function writeCustomerAudit(
+  organizationId: number,
+  userId: number,
+  action: string,
+  status: "SUCCESS" | "FAILURE"
+) {
+  try {
+    await createAuditLog({
+      organizationId,
+      userId,
+      action,
+      toolName: null,
+      status,
+      errorMessage:
+        status === "FAILURE" ? "Customer operation failed." : null,
+    });
+  } catch (error) {
+    console.error("Customer audit logging failed:", error);
+  }
+}
+
+export async function getCustomers() {
+  const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.customer
@@ -17,11 +49,11 @@ export async function getCustomers() {
       "updatedAt"
     )
     .where((fields, fns) =>
-  fns.and(
-    fns.eq(fields.organizationId, user.organizationId),
-    fns.eq(fields.isActive, true)
-  )
-)
+      fns.and(
+        fns.eq(fields.organizationId, user.organizationId),
+        fns.eq(fields.isActive, true)
+      )
+    )
     .build();
 
   return runtime.query(plan);
@@ -32,20 +64,64 @@ export async function createCustomer(input: {
   email: string;
   phone?: string;
 }) {
- const user = await requireCurrentUser();
+  const user = await requireCurrentUser();
 
+  try {
+    const runtime = await getDbRuntime();
+
+    const plan = db.sql.public.customer
+      .insert([
+        {
+          name: input.name,
+          email: input.email,
+          phone: input.phone ?? null,
+          organizationId: user.organizationId,
+        },
+      ])
+      .returning(
+        "id",
+        "name",
+        "email",
+        "phone",
+        "organizationId",
+        "createdAt",
+        "updatedAt"
+      )
+      .build();
+
+    const customers = await runtime.query(plan);
+    const customer = customers[0];
+
+    if (!customer) {
+      throw new Error("Customer creation failed.");
+    }
+
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_CREATED",
+      "SUCCESS"
+    );
+
+    return customer;
+  } catch (error) {
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_CREATED",
+      "FAILURE"
+    );
+
+    throw error;
+  }
+}
+
+export async function getCustomerById(customerId: number) {
+  const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.customer
-    .insert([
-      {
-        name: input.name,
-        email: input.email,
-        phone: input.phone ?? null,
-        organizationId: user.organizationId,
-      },
-    ])
-    .returning(
+    .select(
       "id",
       "name",
       "email",
@@ -54,68 +130,6 @@ export async function createCustomer(input: {
       "createdAt",
       "updatedAt"
     )
-    .build();
-
-  const customers = await runtime.query(plan);
-
-  return customers[0];
-}
-export async function getCustomerById(customerId: number) {
-
-  const user = await requireCurrentUser();
-  const runtime = await getDbRuntime();
-const plan = db.sql.public.customer
-  .select(
-    "id",
-    "name",
-    "email",
-    "phone",
-    "organizationId",
-    "createdAt",
-    "updatedAt"
-  )
-  .where((fields, fns) =>
-   fns.and(
-  fns.eq(fields.id, customerId),
-  fns.eq(fields.organizationId, user.organizationId),
-  fns.eq(fields.isActive, true)
-)
-  )
-  .build();
-
-  const customers = await runtime.query(plan);
-const customer = customers[0];
-
-if (!customer) {
-  throw new Error("Customer not found.");
-}
-
-return customer;
-}
-type UpdateCustomerInput = {
-  name?: string;
-  email?: string;
-  phone?: string;
-};
-export async function updateCustomer(
-  customerId: number,
-  input: UpdateCustomerInput
-) {
- const user = await requireCurrentUser();
- const runtime = await getDbRuntime();
-}
-
-//Delete customer
-export async function deleteCustomer(customerId: number) {
-  const user = await requireCurrentUser();
-
-  const runtime = await getDbRuntime();
-
-  const plan = db.sql.public.customer
-    .update({
-      isActive: false,
-      deletedAt: new Date(),
-    })
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.id, customerId),
@@ -123,21 +137,9 @@ export async function deleteCustomer(customerId: number) {
         fns.eq(fields.isActive, true)
       )
     )
-    .returning(
-      "id",
-      "name",
-      "email",
-      "phone",
-      "organizationId",
-      "isActive",
-      "deletedAt",
-      "createdAt",
-      "updatedAt"
-    )
     .build();
 
   const customers = await runtime.query(plan);
-
   const customer = customers[0];
 
   if (!customer) {
@@ -145,4 +147,128 @@ export async function deleteCustomer(customerId: number) {
   }
 
   return customer;
+}
+
+export async function updateCustomer(
+  customerId: number,
+  input: UpdateCustomerInput
+) {
+  const user = await requireCurrentUser();
+
+  try {
+    const updates = {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.email !== undefined ? { email: input.email } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    };
+
+    if (Object.keys(updates).length === 0) {
+      throw new Error("Provide at least one field to update.");
+    }
+
+    const runtime = await getDbRuntime();
+
+    const plan = db.sql.public.customer
+      .update(updates)
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, customerId),
+          fns.eq(fields.organizationId, user.organizationId),
+          fns.eq(fields.isActive, true)
+        )
+      )
+      .returning(
+        "id",
+        "name",
+        "email",
+        "phone",
+        "organizationId",
+        "createdAt",
+        "updatedAt"
+      )
+      .build();
+
+    const customers = await runtime.query(plan);
+    const customer = customers[0];
+
+    if (!customer) {
+      throw new Error("Customer not found.");
+    }
+
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_UPDATED",
+      "SUCCESS"
+    );
+
+    return customer;
+  } catch (error) {
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_UPDATED",
+      "FAILURE"
+    );
+
+    throw error;
+  }
+}
+
+export async function deleteCustomer(customerId: number) {
+  const user = await requireCurrentUser();
+
+  try {
+    const runtime = await getDbRuntime();
+
+    const plan = db.sql.public.customer
+      .update({
+        isActive: false,
+        deletedAt: new Date(),
+      })
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, customerId),
+          fns.eq(fields.organizationId, user.organizationId),
+          fns.eq(fields.isActive, true)
+        )
+      )
+      .returning(
+        "id",
+        "name",
+        "email",
+        "phone",
+        "organizationId",
+        "isActive",
+        "deletedAt",
+        "createdAt",
+        "updatedAt"
+      )
+      .build();
+
+    const customers = await runtime.query(plan);
+    const customer = customers[0];
+
+    if (!customer) {
+      throw new Error("Customer not found.");
+    }
+
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_DELETED",
+      "SUCCESS"
+    );
+
+    return customer;
+  } catch (error) {
+    await writeCustomerAudit(
+      user.organizationId,
+      user.userId,
+      "CUSTOMER_DELETED",
+      "FAILURE"
+    );
+
+    throw error;
+  }
 }

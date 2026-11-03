@@ -167,3 +167,28 @@ export function CloseIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+
+export function AuditLogsIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 4h14v16H5z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 8h8M8 12h8M8 16h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

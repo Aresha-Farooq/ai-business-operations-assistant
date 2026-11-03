@@ -7,6 +7,7 @@ import type { CurrentWorkspace } from "@/lib/current-workspace";
 import { LogoutButton } from "./logout-button";
 import {
   AssistantIcon,
+  AuditLogsIcon,
   CloseIcon,
   CustomersIcon,
   DashboardIcon,
@@ -17,7 +18,6 @@ import {
   OrdersIcon,
   SettingsIcon,
 } from "./icons";
-
 type DashboardShellProps = {
   workspace: CurrentWorkspace;
   children: ReactNode;
@@ -30,6 +30,7 @@ type NavItem =
       href: string;
       icon: typeof DashboardIcon;
     }
+    
   | {
       id: string;
       label: string;
@@ -52,6 +53,12 @@ const navigation: NavItem[] = [
     comingSoon: true,
     icon: KnowledgeIcon,
   },
+  {
+  id: "audit-logs",
+  label: "Audit Logs",
+  href: "/dashboard/audit-logs",
+  icon: AuditLogsIcon,
+},
   { id: "customers", label: "Customers", comingSoon: true, icon: CustomersIcon },
   { id: "inventory", label: "Inventory", comingSoon: true, icon: InventoryIcon },
   { id: "orders", label: "Orders", comingSoon: true, icon: OrdersIcon },
