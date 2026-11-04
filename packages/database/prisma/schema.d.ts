@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'577c1c0faa0b236a7a76c0f670cf0c27f757caa3d9643becfdec3a976adb7653'>;
+  StorageHashBase<'5104d97a9199aa1405f35ff29d64c3e49ae25abb09115088d1e4d915cd744414'>;
 export type ExecutionHash =
   ExecutionHashBase<'8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274'>;
 export type ProfileHash =
@@ -247,6 +247,7 @@ export type FieldOutputTypes = {
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
       readonly userId: CodecTypes['pg/int4@1']['output'] | null;
       readonly action: CodecTypes['pg/text@1']['output'];
+      readonly source: 'BUSINESS_API' | 'MCP' | 'AUTH' | 'SYSTEM';
       readonly toolName: CodecTypes['pg/text@1']['output'] | null;
       readonly status: 'SUCCESS' | 'FAILURE' | 'DENIED';
       readonly errorMessage: CodecTypes['pg/text@1']['output'] | null;
@@ -412,6 +413,7 @@ export type FieldInputTypes = {
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
       readonly userId: CodecTypes['pg/int4@1']['input'] | null;
       readonly action: CodecTypes['pg/text@1']['input'];
+      readonly source: 'BUSINESS_API' | 'MCP' | 'AUTH' | 'SYSTEM';
       readonly toolName: CodecTypes['pg/text@1']['input'] | null;
       readonly status: 'SUCCESS' | 'FAILURE' | 'DENIED';
       readonly errorMessage: CodecTypes['pg/text@1']['input'] | null;
@@ -578,6 +580,7 @@ export type StorageColumnTypes = {
       readonly errorMessage: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
+      readonly source: 'BUSINESS_API' | 'MCP' | 'AUTH' | 'SYSTEM';
       readonly status: 'SUCCESS' | 'FAILURE' | 'DENIED';
       readonly toolName: CodecTypes['pg/text@1']['output'] | null;
       readonly userId: CodecTypes['pg/int4@1']['output'] | null;
@@ -743,6 +746,7 @@ export type StorageColumnInputTypes = {
       readonly errorMessage: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
+      readonly source: 'BUSINESS_API' | 'MCP' | 'AUTH' | 'SYSTEM';
       readonly status: 'SUCCESS' | 'FAILURE' | 'DENIED';
       readonly toolName: CodecTypes['pg/text@1']['input'] | null;
       readonly userId: CodecTypes['pg/int4@1']['input'] | null;
@@ -1121,6 +1125,7 @@ export namespace Models {
     organizationId: CodecTypes['pg/int4@1']['output'];
     userId: CodecTypes['pg/int4@1']['output'] | null;
     action: CodecTypes['pg/text@1']['output'];
+    source: 'BUSINESS_API' | 'MCP' | 'AUTH' | 'SYSTEM';
     toolName: CodecTypes['pg/text@1']['output'] | null;
     status: 'SUCCESS' | 'FAILURE' | 'DENIED';
     errorMessage: CodecTypes['pg/text@1']['output'] | null;
@@ -1194,6 +1199,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                };
+                readonly source: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'SYSTEM'>;
+                  };
                 };
                 readonly toolName: {
                   readonly nativeType: 'text';
@@ -2564,6 +2578,10 @@ type ContractBase = Omit<
             };
           };
           readonly valueSet: {
+            readonly AuditSource: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['BUSINESS_API', 'MCP', 'AUTH', 'SYSTEM'];
+            };
             readonly AuditStatus: {
               readonly kind: 'valueSet';
               readonly values: readonly ['SUCCESS', 'FAILURE', 'DENIED'];
@@ -2679,6 +2697,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly source: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly toolName: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -2730,6 +2752,7 @@ type ContractBase = Omit<
                 readonly organizationId: { readonly column: 'organizationId' };
                 readonly userId: { readonly column: 'userId' };
                 readonly action: { readonly column: 'action' };
+                readonly source: { readonly column: 'source' };
                 readonly toolName: { readonly column: 'toolName' };
                 readonly status: { readonly column: 'status' };
                 readonly errorMessage: { readonly column: 'errorMessage' };
@@ -4100,6 +4123,15 @@ type ContractBase = Omit<
               { readonly name: 'SUCCESS'; readonly value: 'SUCCESS' },
               { readonly name: 'FAILURE'; readonly value: 'FAILURE' },
               { readonly name: 'DENIED'; readonly value: 'DENIED' },
+            ];
+          };
+          readonly AuditSource: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'BUSINESS_API'; readonly value: 'BUSINESS_API' },
+              { readonly name: 'MCP'; readonly value: 'MCP' },
+              { readonly name: 'AUTH'; readonly value: 'AUTH' },
+              { readonly name: 'SYSTEM'; readonly value: 'SYSTEM' },
             ];
           };
           readonly InventoryMovementType: {

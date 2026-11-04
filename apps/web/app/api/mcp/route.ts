@@ -37,6 +37,7 @@ async function audit(
       organizationId: user.organizationId,
       userId: user.userId,
       action: `MCP_${toolName}`,
+      source: "MCP",
       toolName,
       status,
       errorMessage,

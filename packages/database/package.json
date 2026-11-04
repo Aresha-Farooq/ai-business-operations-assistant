@@ -1,4 +1,3 @@
-
 {
   "name": "@business-platform/database",
   "version": "0.1.0",
@@ -8,7 +7,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@business-platform/auth": "0.1.0",
-    "@business-platform/database": "0.1.0"
+    "@business-platform/auth": "0.1.0"
   }
 }

@@ -156,6 +156,7 @@ export async function changeStock(input: ChangeStockInput) {
         organizationId: user.organizationId,
         userId: user.userId,
         action: auditActions[input.type],
+        source: "BUSINESS_API",
         status: "SUCCESS",
         toolName: null,
       },

@@ -5,11 +5,14 @@ import { useEffect, useState } from "react";
 
 type AuditStatus = "SUCCESS" | "FAILURE" | "DENIED";
 
+type AuditSource = "BUSINESS_API" | "MCP" | "AUTH" | "SYSTEM";
+
 type AuditLog = {
   id: number;
   organizationId: number;
   userId: number | null;
   action: string;
+  source: AuditSource;
   toolName: string | null;
   status: AuditStatus;
   errorMessage: string | null;
@@ -23,6 +26,7 @@ type AuditLogsResponse = {
     pageSize: number;
   };
 };
+
 const auditTools = [
   { value: "get_low_stock_products", label: "Low Stock Products" },
   { value: "get_customer", label: "View Customer" },
@@ -33,11 +37,24 @@ const auditTools = [
   { value: "get_overdue_invoices", label: "Overdue Invoices" },
   { value: "get_invoice", label: "View Invoice" },
 ];
+
+const auditSources: { value: AuditSource; label: string }[] = [
+  { value: "BUSINESS_API", label: "Business API" },
+  { value: "MCP", label: "MCP" },
+  { value: "AUTH", label: "Authentication" },
+  { value: "SYSTEM", label: "System" },
+];
+
+function getSourceLabel(source: AuditSource) {
+  return auditSources.find((item) => item.value === source)?.label ?? source;
+}
+
 export function AuditLogsTable() {
   const [data, setData] = useState<AuditLogsResponse | null>(null);
 
   // Filter states
   const [status, setStatus] = useState<AuditStatus | "ALL">("ALL");
+  const [source, setSource] = useState<AuditSource | "ALL">("ALL");
   const [toolName, setToolName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -46,19 +63,32 @@ export function AuditLogsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
- 
-useEffect(() => {
+ useEffect(() => {
   let cancelled = false;
+  let isFetching = false;
 
-  async function fetchAuditLogs() {
+  async function fetchAuditLogs(showLoading = false) {
+    // Prevent overlapping requests
+    if (isFetching) return;
+
+    isFetching = true;
+
     try {
-      setLoading(true);
+      // Show loading only for the initial request
+      if (showLoading) {
+        setLoading(true);
+      }
+
       setError("");
 
       const params = new URLSearchParams();
 
       if (status !== "ALL") {
         params.set("status", status);
+      }
+
+      if (source !== "ALL") {
+        params.set("source", source);
       }
 
       if (toolName.trim()) {
@@ -95,23 +125,30 @@ useEffect(() => {
         );
       }
     } finally {
-      if (!cancelled) {
+      isFetching = false;
+
+      if (!cancelled && showLoading) {
         setLoading(false);
       }
     }
   }
 
-  fetchAuditLogs();
+  // Initial fetch
+  fetchAuditLogs(true);
+
+  // Refresh data every 5 seconds without hiding the table
+  const interval = setInterval(() => {
+    fetchAuditLogs();
+  }, 5000);
 
   return () => {
     cancelled = true;
+    clearInterval(interval);
   };
-}, [status, toolName, startDate, endDate]);
-
+}, [status, source, toolName, startDate, endDate]);
 
   return (
     <div className="space-y-5">
-
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 
@@ -139,31 +176,57 @@ useEffect(() => {
           </select>
         </div>
 
-        {/* Tool Name Filter */}
-      {/* Tool Name Filter */}
-<div className="flex flex-col gap-2">
-  <label
-    htmlFor="audit-tool"
-    className="text-sm font-medium text-slate-700"
-  >
-    Activity Type
-  </label>
+        {/* Source Filter */}
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="audit-source"
+            className="text-sm font-medium text-slate-700"
+          >
+            Source
+          </label>
 
-  <select
-    id="audit-tool"
-    value={toolName}
-    onChange={(event) => setToolName(event.target.value)}
-    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-  >
-    <option value="">All Activities</option>
+          <select
+            id="audit-source"
+            value={source}
+            onChange={(event) =>
+              setSource(event.target.value as AuditSource | "ALL")
+            }
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+          >
+            <option value="ALL">All Sources</option>
 
-    {auditTools.map((tool) => (
-      <option key={tool.value} value={tool.value}>
-        {tool.label}
-      </option>
-    ))}
-  </select>
-</div>
+            {auditSources.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Activity Type Filter */}
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="audit-tool"
+            className="text-sm font-medium text-slate-700"
+          >
+            Activity Type
+          </label>
+
+          <select
+            id="audit-tool"
+            value={toolName}
+            onChange={(event) => setToolName(event.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+          >
+            <option value="">All Activities</option>
+
+            {auditTools.map((tool) => (
+              <option key={tool.value} value={tool.value}>
+                {tool.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Start Date */}
         <div className="flex flex-col gap-2">
@@ -208,6 +271,7 @@ useEffect(() => {
           type="button"
           onClick={() => {
             setStatus("ALL");
+            setSource("ALL");
             setToolName("");
             setStartDate("");
             setEndDate("");
@@ -249,6 +313,7 @@ useEffect(() => {
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-5 py-4 font-medium">Action</th>
+                <th className="px-5 py-4 font-medium">Source</th>
                 <th className="px-5 py-4 font-medium">Tool</th>
                 <th className="px-5 py-4 font-medium">User ID</th>
                 <th className="px-5 py-4 font-medium">Status</th>
@@ -264,9 +329,12 @@ useEffect(() => {
                   </td>
 
                   <td className="px-5 py-4 text-slate-600">
-            {auditTools.find((tool) => tool.value === log.toolName)?.label
-  ?? log.toolName
-  ?? "—"}
+                    {getSourceLabel(log.source)}
+                  </td>
+
+                  <td className="px-5 py-4 text-slate-600">
+                    {auditTools.find((tool) => tool.value === log.toolName)
+                      ?.label ?? log.toolName ?? "—"}
                   </td>
 
                   <td className="px-5 py-4 text-slate-600">

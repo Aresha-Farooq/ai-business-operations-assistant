@@ -1,7 +1,6 @@
 
 import { NextResponse } from "next/server";
 import { getAuditLogs } from "@business-platform/business";
-import { ZodError } from "zod";
 
 export async function GET(request: Request) {
   try {
@@ -17,10 +16,33 @@ export async function GET(request: Request) {
       );
     }
 
+    const source = searchParams.get("source");
+    const allowedSources = [
+      "BUSINESS_API",
+      "MCP",
+      "AUTH",
+      "SYSTEM",
+    ] as const;
+
+    if (
+      source &&
+      !allowedSources.includes(source as (typeof allowedSources)[number])
+    ) {
+      return NextResponse.json(
+        { error: "Invalid audit source." },
+        { status: 400 }
+      );
+    }
+
     const logs = await getAuditLogs({
       page: Number(searchParams.get("page") ?? 1),
       pageSize: Number(searchParams.get("pageSize") ?? 10),
-      status: status ? status as "SUCCESS" | "FAILURE" | "DENIED" : undefined,
+      status: status
+        ? (status as "SUCCESS" | "FAILURE" | "DENIED")
+        : undefined,
+      source: source
+        ? (source as "BUSINESS_API" | "MCP" | "AUTH" | "SYSTEM")
+        : undefined,
       toolName: searchParams.get("toolName") ?? undefined,
       userId: searchParams.has("userId")
         ? Number(searchParams.get("userId"))
@@ -31,18 +53,25 @@ export async function GET(request: Request) {
 
     return NextResponse.json(logs);
   } catch (error) {
-    if (error instanceof Error && error.message === "Not authenticated.") {
+    if (
+      error instanceof Error &&
+      error.message === "Not authenticated."
+    ) {
       return NextResponse.json(
         { error: "Not authenticated." },
         { status: 401 }
       );
     }
-    if (error instanceof Error && error.message === "Forbidden.") {
-  return NextResponse.json(
-    { error: "You do not have permission to view audit logs." },
-    { status: 403 }
-  );
-}
+
+    if (
+      error instanceof Error &&
+      error.message === "Forbidden."
+    ) {
+      return NextResponse.json(
+        { error: "You do not have permission to view audit logs." },
+        { status: 403 }
+      );
+    }
 
     console.error("GET AUDIT LOGS ERROR:", error);
 

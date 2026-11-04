@@ -1,12 +1,16 @@
 
 import { db, getDbRuntime } from "@business-platform/database";
 import { requirePermission } from "@business-platform/auth/authorization";
-import type { AuditStatus } from "@business-platform/database";
+import type {
+  AuditStatus,
+  AuditSource,
+} from "@business-platform/database";
 
 export interface GetAuditLogsInput {
   page?: number;
   pageSize?: number;
   status?: AuditStatus;
+  source?: AuditSource;
   toolName?: string;
   userId?: number;
   startDate?: string;
@@ -20,7 +24,6 @@ export async function getAuditLogs(input: GetAuditLogsInput = {}) {
   const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 10));
   const offset = (page - 1) * pageSize;
 
-  // Convert selected dates into Pakistan-time boundaries.
   const startDate = input.startDate
     ? new Date(`${input.startDate}T00:00:00+05:00`).toISOString()
     : undefined;
@@ -41,6 +44,7 @@ export async function getAuditLogs(input: GetAuditLogsInput = {}) {
       "organizationId",
       "userId",
       "action",
+      "source",
       "toolName",
       "status",
       "errorMessage",
@@ -51,6 +55,9 @@ export async function getAuditLogs(input: GetAuditLogsInput = {}) {
         fns.eq(fields.organizationId, user.organizationId),
         ...(input.status
           ? [fns.eq(fields.status, input.status)]
+          : []),
+        ...(input.source
+          ? [fns.eq(fields.source, input.source)]
           : []),
         ...(input.toolName
           ? [fns.eq(fields.toolName, input.toolName)]

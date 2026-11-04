@@ -1,10 +1,8 @@
 import "dotenv/config";
-import { db } from "./index.js";
+import { db, getDbRuntime } from "./index.js";
 
 async function testDatabase() {
-  const runtime = await db.connect({
-    url: process.env["DATABASE_URL"]!,
-  });
+  const runtime = await getDbRuntime();
 
   const plan = db.sql.public.organization
     .select("id", "name")

@@ -28,6 +28,12 @@ enum AuditStatus {
   FAILURE
   DENIED
 }
+enum AuditSource {
+  BUSINESS_API
+  MCP
+  AUTH
+  SYSTEM
+}
 
 model Organization {
   id        Int      @id @default(autoincrement())
@@ -393,11 +399,11 @@ model AuditLog {
   userId         Int?
 
   action         String
+  source AuditSource @default(SYSTEM)
   toolName       String?
   status         AuditStatus
 
   errorMessage   String?
-
   organization Organization @relation(
     fields: [organizationId],
     references: [id],

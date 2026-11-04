@@ -1,5 +1,5 @@
 import { verifyPassword } from "./password";
-import { db, getDbRuntime } from "@business-platform/database";
+import { db, getDbRuntime, createAuditLog } from "@business-platform/database";
 import { createAccessToken } from "./jwt";
 
 type LoginUserInput = {
@@ -36,6 +36,14 @@ export async function loginUser(input: LoginUserInput) {
   );
 
   if (!passwordIsValid) {
+    await createAuditLog({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: "LOGIN_FAILED",
+      source: "AUTH",
+      status: "FAILURE",
+    });
+
     throw new Error("Invalid email or password.");
   }
 
@@ -43,6 +51,14 @@ export async function loginUser(input: LoginUserInput) {
     userId: user.id,
     organizationId: user.organizationId,
     role: user.role,
+  });
+
+  await createAuditLog({
+    organizationId: user.organizationId,
+    userId: user.id,
+    action: "LOGIN_SUCCESS",
+    source: "AUTH",
+    status: "SUCCESS",
   });
 
   return {

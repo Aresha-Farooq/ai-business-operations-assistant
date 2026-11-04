@@ -1,10 +1,11 @@
+
 import "dotenv/config";
-import { db } from "@business-platform/database";
+
+
+import { db, getDbRuntime } from "@business-platform/database";
 
 async function checkUsers() {
-  const runtime = await db.connect({
-    url: process.env["DATABASE_URL"]!,
-  });
+  const runtime = await getDbRuntime();
 
   const plan = db.sql.public.user
     .select("id", "name", "email", "organizationId", "role")
@@ -15,5 +16,6 @@ async function checkUsers() {
   console.log("Registered users:");
   console.log(users);
 }
+
 
 checkUsers();

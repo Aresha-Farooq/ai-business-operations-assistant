@@ -1,0 +1,86 @@
+[
+  {
+    "id": "column.public.auditLog.source",
+    "label": "Add column \"source\" to \"auditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "source",
+        "table": "auditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"source\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "auditLog",
+          "source"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"source\"",
+        "sql": "ALTER TABLE \"public\".\"auditLog\" ADD COLUMN \"source\" text DEFAULT 'SYSTEM' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"source\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "auditLog",
+          "source"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.auditLog.auditLog_source_check_f7d4fa33",
+    "label": "Add check constraint \"auditLog_source_check_f7d4fa33\" on \"auditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "auditLog_source_check_f7d4fa33",
+        "table": "auditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"auditLog_source_check_f7d4fa33\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auditLog_source_check_f7d4fa33",
+          "public",
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"auditLog_source_check_f7d4fa33\"",
+        "sql": "ALTER TABLE \"public\".\"auditLog\" ADD CONSTRAINT \"auditLog_source_check_f7d4fa33\" CHECK (\"source\" IN ('BUSINESS_API', 'MCP', 'AUTH', 'SYSTEM'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"auditLog_source_check_f7d4fa33\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auditLog_source_check_f7d4fa33",
+          "public",
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ]
+  }
+]

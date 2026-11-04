@@ -1,11 +1,10 @@
+
 import "dotenv/config";
-import { db } from "@business-platform/database";
+import { db, getDbRuntime } from "@business-platform/database";
 import { verifyPassword } from "./password";
 
 async function checkPassword() {
-  const runtime = await db.connect({
-    url: process.env["DATABASE_URL"]!,
-  });
+  const runtime = await getDbRuntime();
 
   const plan = db.sql.public.user
     .select("email", "passwordHash")

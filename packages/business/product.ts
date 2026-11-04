@@ -14,15 +14,18 @@ async function writeProductAudit(
   status: "SUCCESS" | "FAILURE"
 ) {
   try {
-    await createAuditLog({
-      organizationId,
-      userId,
-      action,
-      toolName: null,
-      status,
-      errorMessage:
-        status === "FAILURE" ? "Product operation failed." : null,
-    });
+   await createAuditLog({
+  organizationId,
+  userId,
+  action,
+  source: "BUSINESS_API",
+  toolName: null,
+  status,
+  errorMessage:
+    status === "FAILURE"
+      ? "Product operation failed."
+      : null,
+});
   } catch (error) {
     console.error("Product audit logging failed:", error);
   }

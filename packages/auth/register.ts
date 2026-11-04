@@ -1,5 +1,6 @@
+
 import { hashPassword } from "./password.js";
-import { db } from "@business-platform/database";
+import { db, getDbRuntime } from "@business-platform/database";
 
 type RegisterUserInput = {
   name: string;
@@ -9,15 +10,14 @@ type RegisterUserInput = {
 };
 
 export async function registerUser(input: RegisterUserInput) {
-  const runtime = await db.connect({
-    url: process.env["DATABASE_URL"]!,
-  });
+ const runtime = await getDbRuntime();
 
   // Check whether the email is already registered
- const existingUserPlan = db.sql.public.user
-  .select("id")
-  .where((fields, fns) => fns.eq(fields.email, input.email))
-  .build();
+  const existingUserPlan = db.sql.public.user
+    .select("id")
+    .where((fields, fns) => fns.eq(fields.email, input.email))
+    .build();
+
   const existingUsers = await runtime.query(existingUserPlan);
 
   if (existingUsers.length > 0) {

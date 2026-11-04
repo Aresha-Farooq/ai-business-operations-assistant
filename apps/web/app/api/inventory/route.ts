@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-
 import { changeStock } from "@business-platform/business/inventory";
 import { getInventoryMovements } from "@business-platform/business/inventory-query";
 import { changeStockSchema } from "@business-platform/validation/inventory";
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
