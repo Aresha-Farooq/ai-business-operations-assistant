@@ -1,11 +1,28 @@
+import { createHash } from "node:crypto";
 import { verifyPassword } from "./password";
-import { db, getDbRuntime, createAuditLog } from "@business-platform/database";
+import {
+  db,
+  getDbRuntime,
+  createAuditLog,
+} from "@business-platform/database";
 import { createAccessToken } from "./jwt";
 
 type LoginUserInput = {
   email: string;
   password: string;
 };
+
+function logUnknownAccountAttempt(email: string) {
+  const emailHash = createHash("sha256")
+    .update(email.trim().toLowerCase())
+    .digest("hex");
+
+  console.warn("LOGIN_FAILED_UNKNOWN_ACCOUNT", {
+    emailHash,
+    source: "AUTH",
+    timestamp: new Date().toISOString(),
+  });
+}
 
 export async function loginUser(input: LoginUserInput) {
   const runtime = await getDbRuntime();
@@ -25,6 +42,7 @@ export async function loginUser(input: LoginUserInput) {
   const users = await runtime.query(userPlan);
 
   if (users.length === 0) {
+    logUnknownAccountAttempt(input.email);
     throw new Error("Invalid email or password.");
   }
 
@@ -70,3 +88,4 @@ export async function loginUser(input: LoginUserInput) {
     accessToken,
   };
 }
+

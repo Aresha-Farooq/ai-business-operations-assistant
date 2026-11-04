@@ -13,8 +13,7 @@ export type Permission =
   | "employees:manage"
   | "settings:manage"
   | "invoices:read"
-|  "audit:read"
-  | "invoices:read";
+  | "audit:read";
 
 const rolePermissions: Record<UserRole, Permission[]> = {
  OWNER: [
