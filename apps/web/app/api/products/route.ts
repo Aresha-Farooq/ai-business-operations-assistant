@@ -1,20 +1,26 @@
+
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+
 import {
   getProducts,
   createProduct,
 } from "@business-platform/business/product";
 
-import { ZodError } from "zod";
-import { createProductSchema } from "@business-platform/validation/product";
+import {
+  createProductSchema,
+} from "@business-platform/validation/product";
+
 export async function GET() {
   try {
     const products = await getProducts();
 
-    return NextResponse.json({
-      products,
-    });
+    return NextResponse.json({ products }, { status: 200 });
   } catch (error) {
-    if (error instanceof Error && error.message === "Not authenticated.") {
+    if (
+      error instanceof Error &&
+      error.message === "Not authenticated."
+    ) {
       return NextResponse.json(
         { error: "Not authenticated." },
         { status: 401 }
@@ -32,11 +38,20 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-   const body = await request.json();
+    let body: unknown;
 
-const validatedData = createProductSchema.parse(body);
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON request body." },
+        { status: 400 }
+      );
+    }
 
-const product = await createProduct(validatedData);
+    const validatedData = createProductSchema.parse(body);
+
+    const product = await createProduct(validatedData);
 
     return NextResponse.json(
       { product },
@@ -44,15 +59,19 @@ const product = await createProduct(validatedData);
     );
   } catch (error) {
     if (error instanceof ZodError) {
-  return NextResponse.json(
-    {
-      error: "Validation failed.",
-      details: error.flatten().fieldErrors,
-    },
-    { status: 400 }
-  );
-}
-    if (error instanceof Error && error.message === "Not authenticated.") {
+      return NextResponse.json(
+        {
+          error: "Validation failed.",
+          details: error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Not authenticated."
+    ) {
       return NextResponse.json(
         { error: "Not authenticated." },
         { status: 401 }

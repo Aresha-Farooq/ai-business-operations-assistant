@@ -1,0 +1,125 @@
+[
+  {
+    "id": "column.public.inventoryMovement.createdBy",
+    "label": "Add column \"createdBy\" to \"inventoryMovement\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "createdBy",
+        "table": "inventoryMovement"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"createdBy\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "inventoryMovement",
+          "createdBy"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"createdBy\"",
+        "sql": "ALTER TABLE \"public\".\"inventoryMovement\" ADD COLUMN \"createdBy\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"createdBy\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "inventoryMovement",
+          "createdBy"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.inventoryMovement.inventoryMovement_createdBy_idx_ba0f792f",
+    "label": "Create index \"inventoryMovement_createdBy_idx_ba0f792f\" on \"inventoryMovement\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "inventoryMovement_createdBy_idx_ba0f792f",
+        "table": "inventoryMovement"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"inventoryMovement_createdBy_idx_ba0f792f\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"inventoryMovement_createdBy_idx_ba0f792f\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"inventoryMovement_createdBy_idx_ba0f792f\"",
+        "sql": "CREATE INDEX \"inventoryMovement_createdBy_idx_ba0f792f\" ON \"public\".\"inventoryMovement\" (\"createdBy\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"inventoryMovement_createdBy_idx_ba0f792f\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"inventoryMovement_createdBy_idx_ba0f792f\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.inventoryMovement.inventoryMovement_createdBy_fkey",
+    "label": "Add foreign key \"inventoryMovement_createdBy_fkey\" on \"inventoryMovement\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "inventoryMovement_createdBy_fkey",
+        "table": "inventoryMovement"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"inventoryMovement_createdBy_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "inventoryMovement_createdBy_fkey",
+          "public",
+          "\"public\".\"inventoryMovement\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"inventoryMovement_createdBy_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"inventoryMovement\"\nADD CONSTRAINT \"inventoryMovement_createdBy_fkey\"\nFOREIGN KEY (\"createdBy\")\nREFERENCES \"public\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"inventoryMovement_createdBy_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "inventoryMovement_createdBy_fkey",
+          "public",
+          "\"public\".\"inventoryMovement\""
+        ]
+      }
+    ]
+  }
+]

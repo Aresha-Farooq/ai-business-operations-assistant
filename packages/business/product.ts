@@ -131,6 +131,7 @@ export async function createProduct(input: {
   }
 }
 
+
 export async function getProductById(productId: number) {
   const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
@@ -155,7 +156,8 @@ export async function getProductById(productId: number) {
       fns.and(
         fns.eq(fields.id, productId),
         fns.eq(fields.organizationId, user.organizationId),
-        fns.eq(fields.isActive, true)
+        fns.eq(fields.isActive, true),
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
       )
     )
     .build();
@@ -169,6 +171,7 @@ export async function getProductById(productId: number) {
 
   return product;
 }
+
 
 export async function updateProduct(
   productId: number,
@@ -184,6 +187,24 @@ export async function updateProduct(
   const user = await requireCurrentUser();
 
   try {
+    // Step 1: Fetch the existing product
+    const existingProduct = await getProductById(productId);
+
+    // Step 2: Calculate the final prices
+    const finalPurchasePrice =
+      input.purchasePrice ?? existingProduct.purchasePrice;
+
+    const finalSalePrice =
+      input.salePrice ?? existingProduct.salePrice;
+
+    // Step 3: Validate the final prices
+    if (finalSalePrice < finalPurchasePrice) {
+      throw new Error(
+        "Sale price cannot be lower than purchase price."
+      );
+    }
+
+    // Step 4: Continue with the update
     const runtime = await getDbRuntime();
 
     const plan = db.sql.public.product
@@ -192,7 +213,8 @@ export async function updateProduct(
         fns.and(
           fns.eq(fields.id, productId),
           fns.eq(fields.organizationId, user.organizationId),
-          fns.eq(fields.isActive, true)
+          fns.eq(fields.isActive, true),
+          fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
         )
       )
       .returning(

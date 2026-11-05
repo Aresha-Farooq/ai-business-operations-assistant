@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'5104d97a9199aa1405f35ff29d64c3e49ae25abb09115088d1e4d915cd744414'>;
+  StorageHashBase<'df7d7d5e01f2ca04fecfa1e68faea013ddc8c3161a47404f8154c97c4238c57d'>;
 export type ExecutionHash =
   ExecutionHashBase<'8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274'>;
 export type ProfileHash =
@@ -304,6 +304,7 @@ export type FieldOutputTypes = {
       readonly quantity: CodecTypes['pg/int4@1']['output'];
       readonly type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGE';
       readonly reason: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdBy: CodecTypes['pg/int4@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
@@ -470,6 +471,7 @@ export type FieldInputTypes = {
       readonly quantity: CodecTypes['pg/int4@1']['input'];
       readonly type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGE';
       readonly reason: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdBy: CodecTypes['pg/int4@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
@@ -631,6 +633,7 @@ export type StorageColumnTypes = {
     };
     readonly inventoryMovement: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly createdBy: CodecTypes['pg/int4@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
       readonly productId: CodecTypes['pg/int4@1']['output'];
@@ -797,6 +800,7 @@ export type StorageColumnInputTypes = {
     };
     readonly inventoryMovement: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly createdBy: CodecTypes['pg/int4@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
       readonly productId: CodecTypes['pg/int4@1']['input'];
@@ -945,8 +949,9 @@ export namespace Models {
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     auditLogs: public_AuditLog[];
     conversations: public_Conversation[];
+    inventoryMovements: public_InventoryMovement[];
     organization: public_Organization;
-    readonly [RelationKeys]?: 'auditLogs' | 'conversations' | 'organization';
+    readonly [RelationKeys]?: 'auditLogs' | 'conversations' | 'inventoryMovements' | 'organization';
   };
   export type public_Customer = {
     id: CodecTypes['pg/int4@1']['output'];
@@ -991,8 +996,9 @@ export namespace Models {
     deletedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    inventoryMovements: public_InventoryMovement[];
     organization: public_Organization;
-    readonly [RelationKeys]?: 'organization';
+    readonly [RelationKeys]?: 'inventoryMovements' | 'organization';
   };
   export type public_InventoryMovement = {
     id: CodecTypes['pg/int4@1']['output'];
@@ -1001,11 +1007,13 @@ export namespace Models {
     quantity: CodecTypes['pg/int4@1']['output'];
     type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGE';
     reason: CodecTypes['pg/text@1']['output'] | null;
+    createdBy: CodecTypes['pg/int4@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    createdByUser: public_User | null;
     organization: public_Organization;
     product: public_Product;
-    readonly [RelationKeys]?: 'organization' | 'product';
+    readonly [RelationKeys]?: 'createdByUser' | 'organization' | 'product';
   };
   export type public_Order = {
     id: CodecTypes['pg/int4@1']['output'];
@@ -1705,6 +1713,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/text@1';
                   readonly nullable: true;
                 };
+                readonly createdBy: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
@@ -1732,6 +1745,12 @@ type ContractBase = Omit<
                   readonly columns: readonly ['organizationId'];
                   readonly unique: false;
                 },
+                {
+                  readonly name: 'inventoryMovement_createdBy_idx_ba0f792f';
+                  readonly prefix: 'inventoryMovement_createdBy_idx';
+                  readonly columns: readonly ['createdBy'];
+                  readonly unique: false;
+                },
               ];
               foreignKeys: readonly [
                 {
@@ -1755,6 +1774,18 @@ type ContractBase = Omit<
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'organization';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'inventoryMovement';
+                    readonly columns: readonly ['createdBy'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
                 },
@@ -2368,6 +2399,12 @@ type ContractBase = Omit<
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
               indexes: readonly [
+                {
+                  readonly name: 'product_org_sku_unique';
+                  readonly columns: readonly ['organizationId', 'sku'];
+                  readonly where: '("deletedAt" IS NULL)';
+                  readonly unique: true;
+                },
                 {
                   readonly name: 'product_organizationId_idx_2e17ef41';
                   readonly prefix: 'product_organizationId_idx';
@@ -3143,6 +3180,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly createdBy: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -3159,6 +3200,15 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly createdByUser: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['createdBy'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
               readonly organization: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -3194,6 +3244,7 @@ type ContractBase = Omit<
                 readonly quantity: { readonly column: 'quantity' };
                 readonly type: { readonly column: 'type' };
                 readonly reason: { readonly column: 'reason' };
+                readonly createdBy: { readonly column: 'createdBy' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -3864,6 +3915,17 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly inventoryMovements: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'InventoryMovement';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['productId'];
+                };
+              };
               readonly organization: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -4051,6 +4113,17 @@ type ContractBase = Omit<
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['userId'];
+                };
+              };
+              readonly inventoryMovements: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'InventoryMovement';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['createdBy'];
                 };
               };
               readonly organization: {

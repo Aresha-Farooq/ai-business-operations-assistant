@@ -59,8 +59,9 @@ const navigation: NavItem[] = [
   href: "/dashboard/audit-logs",
   icon: AuditLogsIcon,
 },
-  { id: "customers", label: "Customers", comingSoon: true, icon: CustomersIcon },
-  { id: "inventory", label: "Inventory", comingSoon: true, icon: InventoryIcon },
+{ id: "customers", label: "Customers", href: "/dashboard/customers", icon: CustomersIcon },
+{ id: "products", label: "Products", href: "/dashboard/products", icon: InventoryIcon },
+  { id: "inventory", label: "Inventory", href: "/dashboard/inventory", icon: InventoryIcon },
   { id: "orders", label: "Orders", comingSoon: true, icon: OrdersIcon },
   { id: "settings", label: "Settings", comingSoon: true, icon: SettingsIcon },
 ];

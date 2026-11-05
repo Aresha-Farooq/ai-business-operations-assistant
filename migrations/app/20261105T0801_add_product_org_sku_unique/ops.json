@@ -1,0 +1,41 @@
+[
+  {
+    "id": "index.product.product_org_sku_unique",
+    "label": "Create index \"product_org_sku_unique\" on \"product\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "product_org_sku_unique",
+        "table": "product"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"product_org_sku_unique\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"product_org_sku_unique\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"product_org_sku_unique\"",
+        "sql": "CREATE UNIQUE INDEX \"product_org_sku_unique\" ON \"public\".\"product\" (\"organizationId\", \"sku\") WHERE ((\"deletedAt\" IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"product_org_sku_unique\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"product_org_sku_unique\""
+        ]
+      }
+    ]
+  }
+]

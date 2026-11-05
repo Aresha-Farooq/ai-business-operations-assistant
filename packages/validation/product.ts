@@ -1,10 +1,19 @@
+
 import { z } from "zod";
 
 export const createProductSchema = z
   .object({
-    name: z.string().min(2, "Product name must be at least 2 characters."),
+    name: z
+      .string()
+      .trim()
+      .min(2, "Product name must be at least 2 characters."),
+
     description: z.string().optional(),
-    sku: z.string().min(1, "SKU is required."),
+
+    sku: z
+      .string()
+      .trim()
+      .min(1, "SKU is required."),
 
     purchasePrice: z
       .number()
@@ -34,28 +43,55 @@ export const createProductSchema = z
     }
   );
 
-  export const updateProductSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters.").optional(),
+export const updateProductSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters.")
+      .optional(),
 
-  description: z.string().optional(),
+    description: z.string().optional(),
 
-  sku: z.string().min(1, "SKU is required.").optional(),
+    sku: z
+      .string()
+      .trim()
+      .min(1, "SKU is required.")
+      .optional(),
 
-  purchasePrice: z.number().nonnegative().optional(),
+    purchasePrice: z
+      .number()
+      .nonnegative("Purchase price cannot be negative.")
+      .optional(),
 
-  salePrice: z.number().nonnegative().optional(),
+    salePrice: z
+      .number()
+      .nonnegative("Sale price cannot be negative.")
+      .optional(),
 
-  minimumStock: z.number().int().nonnegative().optional(),
-}).refine(
-  (data) =>
-    data.purchasePrice === undefined ||
-    data.salePrice === undefined ||
-    data.salePrice >= data.purchasePrice,
-  {
-    message: "Sale price cannot be less than purchase price.",
-    path: ["salePrice"],
-  }
-);
+    minimumStock: z
+      .number()
+      .int("Minimum stock must be a whole number.")
+      .nonnegative("Minimum stock cannot be negative.")
+      .optional(),
+  })
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    {
+      message: "At least one field must be provided for update.",
+    }
+  )
+  .refine(
+    (data) =>
+      data.purchasePrice === undefined ||
+      data.salePrice === undefined ||
+      data.salePrice >= data.purchasePrice,
+    {
+      message: "Sale price cannot be lower than purchase price.",
+      path: ["salePrice"],
+    }
+  );
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
+
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

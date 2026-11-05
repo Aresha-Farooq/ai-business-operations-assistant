@@ -1052,6 +1052,13 @@
                   "kind": "scalar"
                 }
               },
+              "createdBy": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1109,6 +1116,22 @@
               }
             },
             "relations": {
+              "createdByUser": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "createdBy"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
               "organization": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -1146,6 +1169,9 @@
               "fields": {
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "createdBy": {
+                  "column": "createdBy"
                 },
                 "id": {
                   "column": "id"
@@ -2190,6 +2216,21 @@
               }
             },
             "relations": {
+              "inventoryMovements": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "productId"
+                  ]
+                },
+                "to": {
+                  "model": "InventoryMovement",
+                  "namespace": "public"
+                }
+              },
               "organization": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -2502,6 +2543,21 @@
                 },
                 "to": {
                   "model": "Conversation",
+                  "namespace": "public"
+                }
+              },
+              "inventoryMovements": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "createdBy"
+                  ]
+                },
+                "to": {
+                  "model": "InventoryMovement",
                   "namespace": "public"
                 }
               },
@@ -3238,6 +3294,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "createdBy": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -3316,9 +3377,33 @@
                     "namespaceId": "public",
                     "tableName": "organization"
                   }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "createdBy"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "inventoryMovement"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
                 }
               ],
               "indexes": [
+                {
+                  "columns": [
+                    "createdBy"
+                  ],
+                  "name": "inventoryMovement_createdBy_idx_ba0f792f",
+                  "prefix": "inventoryMovement_createdBy_idx",
+                  "unique": false
+                },
                 {
                   "columns": [
                     "organizationId"
@@ -4153,6 +4238,15 @@
               "indexes": [
                 {
                   "columns": [
+                    "organizationId",
+                    "sku"
+                  ],
+                  "name": "product_org_sku_unique",
+                  "unique": true,
+                  "where": "(\"deletedAt\" IS NULL)"
+                },
+                {
+                  "columns": [
                     "organizationId"
                   ],
                   "name": "product_organizationId_idx_2e17ef41",
@@ -4551,7 +4645,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5104d97a9199aa1405f35ff29d64c3e49ae25abb09115088d1e4d915cd744414"
+    "storageHash": "df7d7d5e01f2ca04fecfa1e68faea013ddc8c3161a47404f8154c97c4238c57d"
   },
   "execution": {
     "executionHash": "8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274",

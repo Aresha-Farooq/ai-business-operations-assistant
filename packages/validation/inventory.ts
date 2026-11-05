@@ -1,22 +1,41 @@
+
 import { z } from "zod";
 
-export const changeStockSchema = z.object({
-  productId: z.number().int().positive(),
+export const inventoryMovementSchema = z
+  .object({
+    productId: z.number().int().positive(),
 
-  quantity: z.number().int().positive(
-  "Quantity must be greater than zero."
-),
+    quantity: z
+      .number()
+      .int()
+      .positive("Quantity must be greater than zero."),
 
-  type: z.enum([
-    "PURCHASE",
-    "SALE",
-    "ADJUSTMENT",
-    "RETURN",
-    "DAMAGE",
-  ]),
+    type: z.enum([
+      "PURCHASE",
+      "SALE",
+      "ADJUSTMENT",
+      "RETURN",
+      "DAMAGE",
+    ]),
 
-  reason: z.string().max(500).optional(),
-  adjustmentDirection: z.enum(["INCREASE", "DECREASE"]).optional()
-});
+    adjustmentDirection: z
+      .enum(["INCREASE", "DECREASE"])
+      .optional(),
 
-export type ChangeStockInput = z.infer<typeof changeStockSchema>;
+    reason: z.string().trim().optional(),
+  })
+  .refine(
+    (data) =>
+      data.type === "ADJUSTMENT"
+        ? data.adjustmentDirection !== undefined
+        : data.adjustmentDirection === undefined,
+    {
+      message:
+        "Adjustment direction is required only for adjustments.",
+      path: ["adjustmentDirection"],
+    }
+  );
+
+export type InventoryMovementInput = z.infer<
+  typeof inventoryMovementSchema
+>;

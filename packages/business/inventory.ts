@@ -1,14 +1,25 @@
 
 import {
-  createAuditLog,
   db,
+  getDbRuntime,
+  createAuditLog,
 } from "@business-platform/database";
+
 import { requireCurrentUser } from "@business-platform/auth/session";
 
-type ChangeStockInput = {
+// --------------------------------------------------
+// Types
+// --------------------------------------------------
+
+export type ChangeStockInput = {
   productId: number;
   quantity: number;
-  type: "PURCHASE" | "SALE" | "ADJUSTMENT" | "RETURN" | "DAMAGE";
+  type:
+    | "PURCHASE"
+    | "SALE"
+    | "ADJUSTMENT"
+    | "RETURN"
+    | "DAMAGE";
   adjustmentDirection?: "INCREASE" | "DECREASE";
   reason?: string;
 };
@@ -17,10 +28,15 @@ type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
 
+// --------------------------------------------------
+// Apply stock movement inside a transaction
+// --------------------------------------------------
+
 export async function applyStockMovement(
   tx: InventoryTransaction,
   input: ChangeStockInput,
-  organizationId: number
+  organizationId: number,
+  userId: number
 ) {
   const productPlan = tx.sql.public.product
     .select(
@@ -33,7 +49,9 @@ export async function applyStockMovement(
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.id, input.productId),
-        fns.eq(fields.organizationId, organizationId)
+        fns.eq(fields.organizationId, organizationId),
+        fns.eq(fields.isActive, true),
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
       )
     )
     .build();
@@ -45,35 +63,39 @@ export async function applyStockMovement(
     throw new Error("Product not found.");
   }
 
-  const stockDecreaseTypes = ["SALE", "DAMAGE"];
+  // Determine stock change
 
   let stockChange = input.quantity;
 
-  if (stockDecreaseTypes.includes(input.type)) {
+  if (
+    input.type === "SALE" ||
+    input.type === "DAMAGE"
+  ) {
     stockChange = -input.quantity;
   }
 
   if (input.type === "ADJUSTMENT") {
     if (!input.adjustmentDirection) {
       throw new Error(
-        "Adjustment direction is required for stock adjustment."
+        "Adjustment direction is required."
       );
     }
 
     if (input.adjustmentDirection === "DECREASE") {
       stockChange = -input.quantity;
     }
-
-    if (input.adjustmentDirection === "INCREASE") {
-      stockChange = input.quantity;
-    }
   }
 
-  const newStockQuantity = product.stockQuantity + stockChange;
+  // Calculate new stock
+
+  const newStockQuantity =
+    product.stockQuantity + stockChange;
 
   if (newStockQuantity < 0) {
     throw new Error("Insufficient stock.");
   }
+
+  // Update product stock
 
   const updateProductPlan = tx.sql.public.product
     .update({
@@ -82,7 +104,9 @@ export async function applyStockMovement(
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.id, product.id),
-        fns.eq(fields.organizationId, organizationId)
+        fns.eq(fields.organizationId, organizationId),
+        fns.eq(fields.isActive, true),
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
       )
     )
     .returning(
@@ -93,19 +117,25 @@ export async function applyStockMovement(
     )
     .build();
 
-  const updatedProducts = await tx.query(updateProductPlan);
+  const updatedProducts = await tx.query(
+    updateProductPlan
+  );
+
   const updatedProduct = updatedProducts[0];
 
   if (!updatedProduct) {
     throw new Error("Failed to update product stock.");
   }
 
+  // Record inventory movement
+
   const movementPlan = tx.sql.public.inventoryMovement
     .insert([
       {
         productId: product.id,
         organizationId,
-        quantity: input.quantity,
+        createdBy: userId,
+        quantity: stockChange,
         type: input.type,
         reason: input.reason ?? null,
       },
@@ -114,9 +144,11 @@ export async function applyStockMovement(
       "id",
       "productId",
       "organizationId",
+      "createdBy",
       "quantity",
       "type",
-      "reason"
+      "reason",
+      "createdAt"
     )
     .build();
 
@@ -124,7 +156,9 @@ export async function applyStockMovement(
   const movement = movements[0];
 
   if (!movement) {
-    throw new Error("Failed to create inventory movement.");
+    throw new Error(
+      "Failed to create inventory movement."
+    );
   }
 
   return {
@@ -133,23 +167,30 @@ export async function applyStockMovement(
   };
 }
 
-export async function changeStock(input: ChangeStockInput) {
+// --------------------------------------------------
+// Change stock
+// --------------------------------------------------
+
+export async function changeStock(
+  input: ChangeStockInput
+) {
   const user = await requireCurrentUser();
 
-  const result = await db.transaction(async (tx) => {
-    const movement = await applyStockMovement(
+  const auditActions = {
+    PURCHASE: "STOCK_PURCHASED",
+    SALE: "STOCK_SOLD",
+    ADJUSTMENT: "STOCK_ADJUSTED",
+    RETURN: "STOCK_RETURNED",
+    DAMAGE: "STOCK_DAMAGED",
+  } as const;
+
+  return db.transaction(async (tx) => {
+    const result = await applyStockMovement(
       tx,
       input,
-      user.organizationId
+      user.organizationId,
+      user.userId
     );
-
-    const auditActions = {
-      PURCHASE: "STOCK_PURCHASED",
-      SALE: "STOCK_SOLD",
-      ADJUSTMENT: "STOCK_ADJUSTED",
-      RETURN: "STOCK_RETURNED",
-      DAMAGE: "STOCK_DAMAGED",
-    } as const;
 
     await createAuditLog(
       {
@@ -163,8 +204,126 @@ export async function changeStock(input: ChangeStockInput) {
       tx
     );
 
-    return movement;
+    return result;
   });
+}
 
-  return result;
+// --------------------------------------------------
+// Get inventory movement history
+// --------------------------------------------------
+
+export async function getInventoryMovements() {
+  const user = await requireCurrentUser();
+  const runtime = await getDbRuntime();
+
+  const plan = db.sql.public.inventoryMovement
+    .select(
+      "id",
+      "productId",
+      "organizationId",
+      "createdBy",
+      "quantity",
+      "type",
+      "reason",
+      "createdAt"
+    )
+    .where((fields, fns) =>
+      fns.eq(fields.organizationId, user.organizationId)
+    )
+    .build();
+
+  return runtime.query(plan);
+}
+
+// --------------------------------------------------
+// Get low-stock products
+// --------------------------------------------------
+
+export async function getLowStockProducts() {
+  const user = await requireCurrentUser();
+  const runtime = await getDbRuntime();
+
+  const plan = db.sql.public.product
+    .select(
+      "id",
+      "name",
+      "sku",
+      "stockQuantity",
+      "minimumStock",
+      "organizationId"
+    )
+    .where((fields, fns) =>
+      fns.and(
+        fns.eq(
+          fields.organizationId,
+          user.organizationId
+        ),
+        fns.eq(fields.isActive, true),
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
+        fns.raw`${fields.stockQuantity} <= ${fields.minimumStock}`.returns("pg/bool@1")
+      )
+    )
+    .build();
+
+  return runtime.query(plan);
+}
+
+// --------------------------------------------------
+// Get stock history for one product
+// --------------------------------------------------
+
+export async function getProductStockHistory(
+  productId: number
+) {
+  const user = await requireCurrentUser();
+  const runtime = await getDbRuntime();
+
+  // Verify product belongs to current organization
+
+  const productPlan = db.sql.public.product
+    .select("id")
+    .where((fields, fns) =>
+      fns.and(
+        fns.eq(fields.id, productId),
+        fns.eq(
+          fields.organizationId,
+          user.organizationId
+        ),
+        fns.eq(fields.isActive, true),
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
+      )
+    )
+    .build();
+
+  const products = await runtime.query(productPlan);
+
+  if (!products[0]) {
+    throw new Error("Product not found.");
+  }
+
+  // Retrieve movement history
+
+  const movementPlan = db.sql.public.inventoryMovement
+    .select(
+      "id",
+      "productId",
+      "organizationId",
+      "createdBy",
+      "quantity",
+      "type",
+      "reason",
+      "createdAt"
+    )
+    .where((fields, fns) =>
+      fns.and(
+        fns.eq(fields.productId, productId),
+        fns.eq(
+          fields.organizationId,
+          user.organizationId
+        )
+      )
+    )
+    .build();
+
+  return runtime.query(movementPlan);
 }

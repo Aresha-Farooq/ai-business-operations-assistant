@@ -55,7 +55,15 @@ export async function PATCH(
           { status: 401 }
         );
       }
-
+if (
+  error.message ===
+  "Sale price cannot be lower than purchase price."
+) {
+  return NextResponse.json(
+    { error: error.message },
+    { status: 400 }
+  );
+}
       if (error.message === "Product not found.") {
         return NextResponse.json(
           { error: "Product not found." },
