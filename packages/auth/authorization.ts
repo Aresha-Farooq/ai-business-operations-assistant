@@ -30,16 +30,17 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   "audit:read",
 ],
 
-  MANAGER: [
-    "customers:read",
-    "customers:manage",
-    "orders:read",
-    "orders:manage",
-    "inventory:read",
-    "inventory:manage",
-    "sales:read",
-    "invoices:read",
-  ],
+ MANAGER: [
+  "customers:read",
+  "customers:manage",
+  "orders:read",
+  "orders:manage",
+  "inventory:read",
+  "inventory:manage",
+  "sales:read",
+  "employees:manage",
+  "invoices:read",
+],
 
   STAFF: [
     "customers:read",

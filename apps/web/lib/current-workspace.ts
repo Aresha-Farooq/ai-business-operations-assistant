@@ -1,3 +1,4 @@
+
 import { cache } from "react";
 import { getCurrentUser } from "@business-platform/auth/session";
 import { db, getDbRuntime } from "@business-platform/database";
@@ -5,6 +6,7 @@ import { db, getDbRuntime } from "@business-platform/database";
 export type CurrentWorkspace = {
   userName: string;
   organizationName: string;
+  role: "OWNER" | "MANAGER" | "STAFF";
   dataError?: string;
 };
 
@@ -19,7 +21,7 @@ export const getCurrentWorkspace = cache(async (): Promise<CurrentWorkspace | nu
     const runtime = await getDbRuntime();
 
     const userPlan = db.sql.public.user
-      .select("id", "name", "organizationId")
+      .select("id", "name", "organizationId", "role")
       .where((fields, fns) => fns.eq(fields.id, session.userId))
       .build();
 
@@ -43,6 +45,7 @@ export const getCurrentWorkspace = cache(async (): Promise<CurrentWorkspace | nu
     return {
       userName: user.name,
       organizationName: organization?.name ?? "Workspace",
+     role: user.role as "OWNER" | "MANAGER" | "STAFF",
       dataError: organization
         ? undefined
         : "Workspace details could not be loaded from the database.",
@@ -53,6 +56,7 @@ export const getCurrentWorkspace = cache(async (): Promise<CurrentWorkspace | nu
     return {
       userName: "Account",
       organizationName: "Workspace",
+      role: "STAFF",
       dataError: "Unable to load workspace details right now.",
     };
   }

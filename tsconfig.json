@@ -14,5 +14,5 @@
   },
   "include": [
     "**/*.ts"
-  ]
+, "apps/web/app/dashboard/staff/staff-table.tsx", "apps/web/app/store/[slug]/not-found.tsx"  ]
 }

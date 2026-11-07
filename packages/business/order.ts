@@ -123,16 +123,17 @@ export async function createOrder(input: CreateOrderInput) {
   const createdOrder = await db.transaction(async (tx) => {
     // 12a. Decrease inventory for every ordered product
     for (const item of orderItems) {
-      await applyStockMovement(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "SALE",
-          reason: "Order creation",
-        },
-        user.organizationId
-      );
+     await applyStockMovement(
+  tx,
+  {
+    productId: item.productId,
+    quantity: item.quantity,
+    type: "SALE",
+    reason: "Order creation",
+  },
+  user.organizationId,
+  user.userId
+);
     }
 
     // 12b. Create the order

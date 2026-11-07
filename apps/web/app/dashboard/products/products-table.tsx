@@ -12,6 +12,9 @@ type Product = {
   salePrice: number;
   stockQuantity: number;
   minimumStock: number;
+  category: string | null;
+  imageUrl: string | null;
+  isPublished: boolean;
   createdAt: string;
 };
 
@@ -22,7 +25,9 @@ type ProductForm = {
   purchasePrice: string;
   salePrice: string;
   stockQuantity: string;
-  minimumStock: string;
+  category: string;
+  imageUrl: string;
+  isPublished: boolean;
 };
 
 const emptyForm: ProductForm = {
@@ -32,7 +37,9 @@ const emptyForm: ProductForm = {
   purchasePrice: "",
   salePrice: "",
   stockQuantity: "0",
-  minimumStock: "0",
+  category: "",
+  imageUrl: "",
+  isPublished: false,
 };
 
 export function ProductsTable() {
@@ -79,13 +86,21 @@ export function ProductsTable() {
     if (!term) return products;
 
     return products.filter((product) =>
-      [product.name, product.sku, product.description ?? ""]
-        .some((value) => value.toLowerCase().includes(term))
+      [
+        product.name,
+        product.sku,
+        product.description ?? "",
+        product.category ?? "",
+      ].some((value) => value.toLowerCase().includes(term))
     );
   }, [products, search]);
 
   const lowStockCount = products.filter(
     (product) => product.stockQuantity <= product.minimumStock
+  ).length;
+
+  const publishedCount = products.filter(
+    (product) => product.isPublished
   ).length;
 
   function openAddModal() {
@@ -97,6 +112,7 @@ export function ProductsTable() {
 
   function openEditModal(product: Product) {
     setEditingProduct(product);
+
     setForm({
       name: product.name,
       description: product.description ?? "",
@@ -104,8 +120,11 @@ export function ProductsTable() {
       purchasePrice: String(product.purchasePrice),
       salePrice: String(product.salePrice),
       stockQuantity: String(product.stockQuantity),
-      minimumStock: String(product.minimumStock),
+      category: product.category ?? "",
+      imageUrl: product.imageUrl ?? "",
+      isPublished: product.isPublished,
     });
+
     setError("");
     setModalOpen(true);
   }
@@ -116,19 +135,18 @@ export function ProductsTable() {
     const purchasePrice = Number(form.purchasePrice);
     const salePrice = Number(form.salePrice);
     const stockQuantity = Number(form.stockQuantity);
-    const minimumStock = Number(form.minimumStock);
 
     if (
       !Number.isFinite(purchasePrice) ||
       !Number.isFinite(salePrice) ||
-      !Number.isInteger(stockQuantity) ||
-      !Number.isInteger(minimumStock) ||
       purchasePrice < 0 ||
       salePrice < 0 ||
-      stockQuantity < 0 ||
-      minimumStock < 0
+      (!editingProduct &&
+        (!Number.isInteger(stockQuantity) || stockQuantity < 0))
     ) {
-      setError("Please enter valid non-negative prices and whole stock quantities.");
+      setError(
+        "Please enter valid non-negative prices and a whole stock quantity."
+      );
       return;
     }
 
@@ -149,7 +167,10 @@ export function ProductsTable() {
         sku: form.sku.trim(),
         purchasePrice,
         salePrice,
-        minimumStock,
+        minimumStock: 5,
+        category: form.category.trim(),
+        imageUrl: form.imageUrl.trim(),
+        isPublished: form.isPublished,
         ...(isEditing ? {} : { stockQuantity }),
       };
 
@@ -171,7 +192,10 @@ export function ProductsTable() {
       if (!response.ok) {
         const validationErrors = result.details
           ? Array.isArray(result.details)
-            ? result.details.map((item: { message?: string }) => item.message).filter(Boolean).join(" ")
+            ? result.details
+                .map((item: { message?: string }) => item.message)
+                .filter(Boolean)
+                .join(" ")
             : Object.values(result.details).flat().join(" ")
           : "";
 
@@ -243,21 +267,11 @@ export function ProductsTable() {
           </p>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div>
-            <p className="text-sm text-slate-500">Product Directory</p>
-            <p className="mt-2 font-semibold text-slate-900">
-              Manage your products
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            + Add Product
-          </button>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Published Products</p>
+          <p className="mt-2 text-3xl font-bold text-emerald-600">
+            {publishedCount}
+          </p>
         </div>
       </div>
 
@@ -271,13 +285,23 @@ export function ProductsTable() {
             </p>
           </div>
 
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name or SKU..."
-            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200 sm:max-w-xs"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search products..."
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200 sm:max-w-xs"
+            />
+
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700"
+            >
+              + Add Product
+            </button>
+          </div>
         </div>
 
         {error && !modalOpen && (
@@ -317,15 +341,16 @@ export function ProductsTable() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1050px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-5 py-4 font-semibold">Product</th>
                   <th className="px-5 py-4 font-semibold">SKU</th>
+                  <th className="px-5 py-4 font-semibold">Category</th>
                   <th className="px-5 py-4 font-semibold">Purchase Price</th>
                   <th className="px-5 py-4 font-semibold">Sale Price</th>
                   <th className="px-5 py-4 font-semibold">Stock</th>
-                  <th className="px-5 py-4 font-semibold">Status</th>
+                  <th className="px-5 py-4 font-semibold">Store Status</th>
                   <th className="px-5 py-4 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -338,18 +363,38 @@ export function ProductsTable() {
                   return (
                     <tr key={product.id} className="hover:bg-slate-50">
                       <td className="px-5 py-4">
-                        <p className="font-medium text-slate-900">
-                          {product.name}
-                        </p>
-                        {product.description && (
-                          <p className="mt-1 max-w-xs truncate text-xs text-slate-500">
-                            {product.description}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="h-11 w-11 rounded-lg border border-slate-200 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">
+                              No image
+                            </div>
+                          )}
+
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              {product.name}
+                            </p>
+                            {product.description && (
+                              <p className="mt-1 max-w-xs truncate text-xs text-slate-500">
+                                {product.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       <td className="px-5 py-4 text-slate-600">
                         {product.sku}
+                      </td>
+
+                      <td className="px-5 py-4 text-slate-600">
+                        {product.category || "—"}
                       </td>
 
                       <td className="px-5 py-4 text-slate-600">
@@ -361,21 +406,26 @@ export function ProductsTable() {
                       </td>
 
                       <td className="px-5 py-4 text-slate-600">
-                        {product.stockQuantity}
+                        <span>{product.stockQuantity}</span>
                         <span className="ml-1 text-xs text-slate-400">
                           / min {product.minimumStock}
                         </span>
+                        {lowStock && (
+                          <p className="mt-1 text-xs font-medium text-amber-600">
+                            Low stock
+                          </p>
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            lowStock
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-emerald-100 text-emerald-700"
+                            product.isPublished
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          {lowStock ? "Low Stock" : "In Stock"}
+                          {product.isPublished ? "Published" : "Draft"}
                         </span>
                       </td>
 
@@ -420,7 +470,7 @@ export function ProductsTable() {
                   {editingProduct ? "Edit Product" : "Add Product"}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Enter your product details.
+                  Enter your product details and storefront information.
                 </p>
               </div>
 
@@ -484,6 +534,48 @@ export function ProductsTable() {
                 />
               </div>
 
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Category (Optional)
+                </label>
+                <input
+                  value={form.category}
+                  onChange={(event) =>
+                    setForm({ ...form, category: event.target.value })
+                  }
+                  placeholder="e.g. Electronics, Clothing"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Product Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(event) =>
+                    setForm({ ...form, imageUrl: event.target.value })
+                  }
+                  placeholder="https://example.com/product-image.jpg"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+
+                {form.imageUrl.trim() && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs text-slate-500">
+                      Image preview
+                    </p>
+                    <img
+                      src={form.imageUrl}
+                      alt="Product preview"
+                      className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -496,7 +588,10 @@ export function ProductsTable() {
                     step="0.01"
                     value={form.purchasePrice}
                     onChange={(event) =>
-                      setForm({ ...form, purchasePrice: event.target.value })
+                      setForm({
+                        ...form,
+                        purchasePrice: event.target.value,
+                      })
                     }
                     placeholder="0.00"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
@@ -534,28 +629,39 @@ export function ProductsTable() {
                     step="1"
                     value={form.stockQuantity}
                     onChange={(event) =>
-                      setForm({ ...form, stockQuantity: event.target.value })
+                      setForm({
+                        ...form,
+                        stockQuantity: event.target.value,
+                      })
                     }
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
                   />
                 </div>
               )}
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Minimum Stock Level
+              <div className="rounded-lg border border-slate-200 p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.isPublished}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        isPublished: event.target.checked,
+                      })
+                    }
+                    className="mt-1 h-4 w-4 rounded border-slate-300"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">
+                      Publish this product
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Published products can appear in your public online store.
+                      Unchecked products remain drafts.
+                    </span>
+                  </span>
                 </label>
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.minimumStock}
-                  onChange={(event) =>
-                    setForm({ ...form, minimumStock: event.target.value })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
               </div>
 
               {error && (
@@ -566,6 +672,7 @@ export function ProductsTable() {
 
               <p className="text-xs text-slate-500">
                 Sale price must be equal to or greater than purchase price.
+                Low-stock threshold is automatically set to 5 units.
                 Stock changes after creation are managed through Inventory.
               </p>
 

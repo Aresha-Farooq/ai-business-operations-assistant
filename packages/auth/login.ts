@@ -28,16 +28,18 @@ export async function loginUser(input: LoginUserInput) {
   const runtime = await getDbRuntime();
 
   const userPlan = db.sql.public.user
-    .select(
-      "id",
-      "name",
-      "email",
-      "passwordHash",
-      "organizationId",
-      "role"
-    )
-    .where((fields, fns) => fns.eq(fields.email, input.email))
-    .build();
+  .select(
+    "id",
+    "name",
+    "email",
+    "passwordHash",
+    "organizationId",
+    "role",
+    "isActive"
+  )
+  .where((fields, fns) => fns.eq(fields.email, input.email))
+  .build();
+  
 
   const users = await runtime.query(userPlan);
 
@@ -64,7 +66,17 @@ export async function loginUser(input: LoginUserInput) {
 
     throw new Error("Invalid email or password.");
   }
+if (!user.isActive) {
+  await createAuditLog({
+    organizationId: user.organizationId,
+    userId: user.id,
+    action: "LOGIN_BLOCKED_INACTIVE_ACCOUNT",
+    source: "AUTH",
+    status: "FAILURE",
+  });
 
+  throw new Error("Invalid email or password.");
+}
   const accessToken = await createAccessToken({
     userId: user.id,
     organizationId: user.organizationId,

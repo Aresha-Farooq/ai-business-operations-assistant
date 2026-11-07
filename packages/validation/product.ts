@@ -34,6 +34,12 @@ export const createProductSchema = z
       .int("Minimum stock must be a whole number.")
       .nonnegative("Minimum stock cannot be negative.")
       .optional(),
+
+    category: z.string().trim().optional(),
+
+    imageUrl: z.string().trim().url("Please enter a valid image URL.").optional().or(z.literal("")),
+
+    isPublished: z.boolean().optional(),
   })
   .refine(
     (data) => data.salePrice >= data.purchasePrice,
@@ -74,6 +80,12 @@ export const updateProductSchema = z
       .int("Minimum stock must be a whole number.")
       .nonnegative("Minimum stock cannot be negative.")
       .optional(),
+
+    category: z.string().trim().optional(),
+
+    imageUrl: z.string().trim().url("Please enter a valid image URL.").optional().or(z.literal("")),
+
+    isPublished: z.boolean().optional(),
   })
   .refine(
     (data) => Object.keys(data).length > 0,

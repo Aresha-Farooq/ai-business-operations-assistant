@@ -49,6 +49,7 @@ documents Document[]
   inventoryMovements InventoryMovement[]
   users             User[]
   customers         Customer[]
+  products          Product[]
   payments          Payment[]
   documentChunks DocumentChunk[]
 }
@@ -60,9 +61,14 @@ model User {
   passwordHash   String
   organizationId Int
   role           UserRole @default(STAFF)
-  auditLogs AuditLog[]
-conversations Conversation[]
-inventoryMovements InventoryMovement[]
+
+  isActive       Boolean  @default(true)
+  deletedAt      TimestamptzString?
+
+  auditLogs          AuditLog[]
+  conversations      Conversation[]
+  inventoryMovements InventoryMovement[]
+
   organization Organization @relation(
     fields: [organizationId],
     references: [id]
@@ -126,7 +132,9 @@ model Product {
   minimumStock   Int      @default(0)
 
   organizationId Int
-
+imageUrl     String?
+category     String?
+isPublished  Boolean @default(false)
   isActive       Boolean  @default(true)
   deletedAt      TimestamptzString?
 inventoryMovements InventoryMovement[]

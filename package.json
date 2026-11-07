@@ -13,7 +13,8 @@
     "start": "npm run start --workspace=web",
     "lint": "npm run lint --workspace=web",
     "postinstall": "prisma skills sync || exit 0",
-    "contract:emit": "prisma contract emit"
+    "contract:emit": "prisma contract emit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@prisma/cli-engine": "^0.4.0",

@@ -1,6 +1,3 @@
-
-
-
 import type { Contract as Start } from '../../snapshots/a57bee347bd7b49064c0bed3f7e1ab01985d8b923f17f617731a12efc0a773ae/contract';
 
 import startContract from '../../snapshots/a57bee347bd7b49064c0bed3f7e1ab01985d8b923f17f617731a12efc0a773ae/contract.json' with { type: 'json' };

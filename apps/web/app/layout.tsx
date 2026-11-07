@@ -1,4 +1,6 @@
+
 import "./globals.css";
+import { CartProvider } from "./store/cart-provider";
 
 export default function RootLayout({
   children,
@@ -7,7 +9,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <CartProvider>{children}</CartProvider>
+      </body>
     </html>
   );
 }
+

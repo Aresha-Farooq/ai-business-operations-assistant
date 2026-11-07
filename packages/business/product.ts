@@ -14,18 +14,18 @@ async function writeProductAudit(
   status: "SUCCESS" | "FAILURE"
 ) {
   try {
-   await createAuditLog({
-  organizationId,
-  userId,
-  action,
-  source: "BUSINESS_API",
-  toolName: null,
-  status,
-  errorMessage:
-    status === "FAILURE"
-      ? "Product operation failed."
-      : null,
-});
+    await createAuditLog({
+      organizationId,
+      userId,
+      action,
+      source: "BUSINESS_API",
+      toolName: null,
+      status,
+      errorMessage:
+        status === "FAILURE"
+          ? "Product operation failed."
+          : null,
+    });
   } catch (error) {
     console.error("Product audit logging failed:", error);
   }
@@ -48,6 +48,9 @@ export async function getProducts() {
       "organizationId",
       "isActive",
       "deletedAt",
+      "category",
+      "imageUrl",
+      "isPublished",
       "createdAt",
       "updatedAt"
     )
@@ -70,6 +73,9 @@ export async function createProduct(input: {
   salePrice: number;
   stockQuantity?: number;
   minimumStock?: number;
+  category?: string;
+  imageUrl?: string;
+  isPublished?: boolean;
 }) {
   const user = await requireCurrentUser();
 
@@ -85,7 +91,10 @@ export async function createProduct(input: {
           purchasePrice: input.purchasePrice,
           salePrice: input.salePrice,
           stockQuantity: input.stockQuantity ?? 0,
-          minimumStock: input.minimumStock ?? 0,
+        minimumStock: 5,
+          category: input.category || null,
+          imageUrl: input.imageUrl || null,
+          isPublished: input.isPublished ?? false,
           organizationId: user.organizationId,
         },
       ])
@@ -98,6 +107,9 @@ export async function createProduct(input: {
         "salePrice",
         "stockQuantity",
         "minimumStock",
+        "category",
+        "imageUrl",
+        "isPublished",
         "organizationId",
         "createdAt",
         "updatedAt"
@@ -131,7 +143,6 @@ export async function createProduct(input: {
   }
 }
 
-
 export async function getProductById(productId: number) {
   const user = await requireCurrentUser();
   const runtime = await getDbRuntime();
@@ -146,6 +157,9 @@ export async function getProductById(productId: number) {
       "salePrice",
       "stockQuantity",
       "minimumStock",
+      "category",
+      "imageUrl",
+      "isPublished",
       "organizationId",
       "isActive",
       "deletedAt",
@@ -172,7 +186,6 @@ export async function getProductById(productId: number) {
   return product;
 }
 
-
 export async function updateProduct(
   productId: number,
   input: {
@@ -182,33 +195,35 @@ export async function updateProduct(
     purchasePrice?: number;
     salePrice?: number;
     minimumStock?: number;
+    category?: string;
+    imageUrl?: string | null;
+    isPublished?: boolean;
   }
 ) {
   const user = await requireCurrentUser();
 
   try {
-    // Step 1: Fetch the existing product
     const existingProduct = await getProductById(productId);
 
-    // Step 2: Calculate the final prices
     const finalPurchasePrice =
       input.purchasePrice ?? existingProduct.purchasePrice;
 
     const finalSalePrice =
       input.salePrice ?? existingProduct.salePrice;
 
-    // Step 3: Validate the final prices
     if (finalSalePrice < finalPurchasePrice) {
       throw new Error(
         "Sale price cannot be lower than purchase price."
       );
     }
 
-    // Step 4: Continue with the update
     const runtime = await getDbRuntime();
 
     const plan = db.sql.public.product
-      .update(input)
+      .update({
+  ...input,
+  minimumStock: undefined,
+})
       .where((fields, fns) =>
         fns.and(
           fns.eq(fields.id, productId),
@@ -226,6 +241,9 @@ export async function updateProduct(
         "salePrice",
         "stockQuantity",
         "minimumStock",
+        "category",
+        "imageUrl",
+        "isPublished",
         "organizationId",
         "isActive",
         "deletedAt",

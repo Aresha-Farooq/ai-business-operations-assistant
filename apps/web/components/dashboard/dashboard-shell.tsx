@@ -29,8 +29,8 @@ type NavItem =
       label: string;
       href: string;
       icon: typeof DashboardIcon;
+      roles?: ("OWNER" | "MANAGER")[];
     }
-    
   | {
       id: string;
       label: string;
@@ -58,6 +58,13 @@ const navigation: NavItem[] = [
   label: "Audit Logs",
   href: "/dashboard/audit-logs",
   icon: AuditLogsIcon,
+},
+{
+  id: "staff",
+  label: "Staff Management",
+  href: "/dashboard/staff",
+  icon: CustomersIcon,
+  roles: ["OWNER", "MANAGER"],
 },
 { id: "customers", label: "Customers", href: "/dashboard/customers", icon: CustomersIcon },
 { id: "products", label: "Products", href: "/dashboard/products", icon: InventoryIcon },
@@ -113,6 +120,13 @@ export function DashboardShell({ workspace, children }: DashboardShellProps) {
 
       <nav aria-label="Dashboard" className="flex-1 space-y-1 overflow-y-auto p-3">
         {navigation.map((item) => {
+       if (
+  "roles" in item &&
+  item.roles &&
+  !(item.roles as string[]).includes(workspace.role)
+) {
+  return null;
+}
           if ("comingSoon" in item) {
             const Icon = item.icon;
             return (
