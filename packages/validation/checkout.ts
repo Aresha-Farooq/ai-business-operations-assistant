@@ -1,12 +1,36 @@
+
 import { z } from "zod";
 
-export const checkoutSchema = z.object({
-  customer: z.object({
-    name: z.string().min(2, "Name is required."),
-    email: z.string().email("Invalid email address."),
-    phone: z.string().min(7, "Phone number is required."),
-    address: z.string().min(5, "Address is required."),
-  }),
+export const guestCheckoutSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Name must be at least 2 characters."),
+
+  email: z
+    .string()
+    .trim()
+    .email("Please enter a valid email address."),
+
+  phone: z
+    .string()
+    .trim()
+    .min(7, "Please enter a valid phone number."),
+
+  address: z
+    .string()
+    .trim()
+    .min(5, "Please enter your delivery address."),
+
+  city: z
+    .string()
+    .trim()
+    .min(2, "Please enter your city."),
+
+  deliveryInstructions: z
+    .string()
+    .trim()
+    .optional(),
 
   items: z
     .array(
@@ -15,7 +39,17 @@ export const checkoutSchema = z.object({
         quantity: z.number().int().positive(),
       })
     )
-    .min(1, "Cart cannot be empty."),
+    .min(1, "Your cart cannot be empty.")
+    .refine(
+      (items) =>
+        new Set(items.map((item) => item.productId)).size ===
+        items.length,
+      "A product cannot appear more than once in an order."
+    ),
+
+  paymentMethod: z.literal("COD"),
 });
 
-export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type GuestCheckoutInput = z.infer<
+  typeof guestCheckoutSchema
+>;

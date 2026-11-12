@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'5e0ea89884786b7bd2de0ffee419e46a944792b1ba668fe00ca45e3bdd3f0446'>;
+  StorageHashBase<'c909d89c4fab829379d244aee8d70c4440cefa7ccf5084d020fc2f83b3b53f1f'>;
 export type ExecutionHash =
   ExecutionHashBase<'8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274'>;
 export type ProfileHash =
@@ -336,6 +336,12 @@ export type FieldOutputTypes = {
       readonly status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED';
       readonly shippingStatus: 'NOT_SHIPPED' | 'SHIPPED' | 'DELIVERED';
       readonly totalAmount: CodecTypes['pg/float8@1']['output'];
+      readonly shippingName: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingEmail: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingPhone: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingAddress: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingCity: CodecTypes['pg/text@1']['output'] | null;
+      readonly deliveryInstructions: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
@@ -508,6 +514,12 @@ export type FieldInputTypes = {
       readonly status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED';
       readonly shippingStatus: 'NOT_SHIPPED' | 'SHIPPED' | 'DELIVERED';
       readonly totalAmount: CodecTypes['pg/float8@1']['input'];
+      readonly shippingName: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingEmail: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingPhone: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingAddress: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingCity: CodecTypes['pg/text@1']['input'] | null;
+      readonly deliveryInstructions: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
@@ -676,8 +688,14 @@ export type StorageColumnTypes = {
     readonly order: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly customerId: CodecTypes['pg/int4@1']['output'];
+      readonly deliveryInstructions: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly organizationId: CodecTypes['pg/int4@1']['output'];
+      readonly shippingAddress: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingCity: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingEmail: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingName: CodecTypes['pg/text@1']['output'] | null;
+      readonly shippingPhone: CodecTypes['pg/text@1']['output'] | null;
       readonly shippingStatus: 'NOT_SHIPPED' | 'SHIPPED' | 'DELIVERED';
       readonly status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED';
       readonly totalAmount: CodecTypes['pg/float8@1']['output'];
@@ -848,8 +866,14 @@ export type StorageColumnInputTypes = {
     readonly order: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly customerId: CodecTypes['pg/int4@1']['input'];
+      readonly deliveryInstructions: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly organizationId: CodecTypes['pg/int4@1']['input'];
+      readonly shippingAddress: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingCity: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingEmail: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingName: CodecTypes['pg/text@1']['input'] | null;
+      readonly shippingPhone: CodecTypes['pg/text@1']['input'] | null;
       readonly shippingStatus: 'NOT_SHIPPED' | 'SHIPPED' | 'DELIVERED';
       readonly status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED';
       readonly totalAmount: CodecTypes['pg/float8@1']['input'];
@@ -987,9 +1011,10 @@ export namespace Models {
     deletedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    orders: public_Order[];
     organization: public_Organization;
     tickets: public_Ticket[];
-    readonly [RelationKeys]?: 'organization' | 'tickets';
+    readonly [RelationKeys]?: 'orders' | 'organization' | 'tickets';
   };
   export type public_Ticket = {
     id: CodecTypes['pg/int4@1']['output'];
@@ -1049,6 +1074,12 @@ export namespace Models {
     status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED';
     shippingStatus: 'NOT_SHIPPED' | 'SHIPPED' | 'DELIVERED';
     totalAmount: CodecTypes['pg/float8@1']['output'];
+    shippingName: CodecTypes['pg/text@1']['output'] | null;
+    shippingEmail: CodecTypes['pg/text@1']['output'] | null;
+    shippingPhone: CodecTypes['pg/text@1']['output'] | null;
+    shippingAddress: CodecTypes['pg/text@1']['output'] | null;
+    shippingCity: CodecTypes['pg/text@1']['output'] | null;
+    deliveryInstructions: CodecTypes['pg/text@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     customer: public_Customer;
@@ -2049,6 +2080,36 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/float8@1';
                   readonly nullable: false;
                 };
+                readonly shippingName: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly shippingEmail: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly shippingPhone: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly shippingAddress: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly shippingCity: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly deliveryInstructions: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
@@ -2986,6 +3047,17 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly orders: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Order';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['customerId'];
+                };
+              };
               readonly organization: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -3496,6 +3568,30 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/float8@1' };
               };
+              readonly shippingName: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly shippingEmail: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly shippingPhone: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly shippingAddress: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly shippingCity: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly deliveryInstructions: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -3581,6 +3677,12 @@ type ContractBase = Omit<
                 readonly status: { readonly column: 'status' };
                 readonly shippingStatus: { readonly column: 'shippingStatus' };
                 readonly totalAmount: { readonly column: 'totalAmount' };
+                readonly shippingName: { readonly column: 'shippingName' };
+                readonly shippingEmail: { readonly column: 'shippingEmail' };
+                readonly shippingPhone: { readonly column: 'shippingPhone' };
+                readonly shippingAddress: { readonly column: 'shippingAddress' };
+                readonly shippingCity: { readonly column: 'shippingCity' };
+                readonly deliveryInstructions: { readonly column: 'deliveryInstructions' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };

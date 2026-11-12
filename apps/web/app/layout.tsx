@@ -1,7 +1,5 @@
-
 import "./globals.css";
 import { CartProvider } from "./store/cart-provider";
-
 export default function RootLayout({
   children,
 }: Readonly<{

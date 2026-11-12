@@ -668,6 +668,21 @@
               }
             },
             "relations": {
+              "orders": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "customerId"
+                  ]
+                },
+                "to": {
+                  "model": "Order",
+                  "namespace": "public"
+                }
+              },
               "organization": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -1463,6 +1478,13 @@
                   "kind": "scalar"
                 }
               },
+              "deliveryInstructions": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1474,6 +1496,41 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "shippingAddress": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "shippingCity": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "shippingEmail": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "shippingName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "shippingPhone": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -1606,11 +1663,29 @@
                 "customerId": {
                   "column": "customerId"
                 },
+                "deliveryInstructions": {
+                  "column": "deliveryInstructions"
+                },
                 "id": {
                   "column": "id"
                 },
                 "organizationId": {
                   "column": "organizationId"
+                },
+                "shippingAddress": {
+                  "column": "shippingAddress"
+                },
+                "shippingCity": {
+                  "column": "shippingCity"
+                },
+                "shippingEmail": {
+                  "column": "shippingEmail"
+                },
+                "shippingName": {
+                  "column": "shippingName"
+                },
+                "shippingPhone": {
+                  "column": "shippingPhone"
                 },
                 "shippingStatus": {
                   "column": "shippingStatus"
@@ -3771,6 +3846,11 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "deliveryInstructions": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -3784,6 +3864,31 @@
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
                   "nullable": false
+                },
+                "shippingAddress": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "shippingCity": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "shippingEmail": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "shippingName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "shippingPhone": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "shippingStatus": {
                   "codecId": "pg/text@1",
@@ -4743,7 +4848,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5e0ea89884786b7bd2de0ffee419e46a944792b1ba668fe00ca45e3bdd3f0446"
+    "storageHash": "c909d89c4fab829379d244aee8d70c4440cefa7ccf5084d020fc2f83b3b53f1f"
   },
   "execution": {
     "executionHash": "8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274",

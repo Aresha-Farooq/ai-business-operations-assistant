@@ -1,0 +1,254 @@
+[
+  {
+    "id": "column.public.order.deliveryInstructions",
+    "label": "Add column \"deliveryInstructions\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "deliveryInstructions",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"deliveryInstructions\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "deliveryInstructions"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"deliveryInstructions\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"deliveryInstructions\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"deliveryInstructions\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "deliveryInstructions"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.order.shippingAddress",
+    "label": "Add column \"shippingAddress\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "shippingAddress",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"shippingAddress\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingAddress"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"shippingAddress\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"shippingAddress\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"shippingAddress\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingAddress"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.order.shippingCity",
+    "label": "Add column \"shippingCity\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "shippingCity",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"shippingCity\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingCity"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"shippingCity\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"shippingCity\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"shippingCity\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingCity"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.order.shippingEmail",
+    "label": "Add column \"shippingEmail\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "shippingEmail",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"shippingEmail\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingEmail"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"shippingEmail\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"shippingEmail\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"shippingEmail\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingEmail"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.order.shippingName",
+    "label": "Add column \"shippingName\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "shippingName",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"shippingName\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingName"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"shippingName\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"shippingName\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"shippingName\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingName"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.order.shippingPhone",
+    "label": "Add column \"shippingPhone\" to \"order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "shippingPhone",
+        "table": "order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"shippingPhone\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingPhone"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"shippingPhone\"",
+        "sql": "ALTER TABLE \"public\".\"order\" ADD COLUMN \"shippingPhone\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"shippingPhone\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "order",
+          "shippingPhone"
+        ]
+      }
+    ]
+  }
+]

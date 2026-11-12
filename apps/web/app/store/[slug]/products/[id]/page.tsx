@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AddToCartButton from "./add-to-cart-button";
 import { notFound } from "next/navigation";
 import { getStorefrontProduct } from "@business-platform/business/storefront";
 export default async function StoreProductPage({
@@ -80,9 +81,14 @@ export default async function StoreProductPage({
             )}
           </div>
 
-          <p className="mt-4 text-sm text-gray-500">
-            Shopping cart functionality will be available soon.
-          </p>
+        <AddToCartButton
+  productId={String(product.id)}
+  storeSlug={slug}
+  name={product.name}
+  price={Number(product.salePrice)}
+  imageUrl={product.imageUrl}
+  stockQuantity={product.stockQuantity}
+/>
         </div>
       </section>
     </main>

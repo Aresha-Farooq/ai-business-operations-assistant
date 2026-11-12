@@ -93,6 +93,7 @@ model Customer {
     references: [id]
   )
 
+  orders Order[]
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
@@ -208,29 +209,42 @@ enum InvoiceStatus {
   VOID
 }
 
+
 model Order {
   id             Int         @id @default(autoincrement())
   customerId     Int
   organizationId Int
-  status         OrderStatus @default(PENDING)
+
+  status         OrderStatus    @default(PENDING)
   shippingStatus ShippingStatus @default(NOT_SHIPPED)
   totalAmount    Float
-  invoice Invoice?
-payments Payment[]
-  customer       Customer    @relation(
+
+shippingName         String?
+shippingEmail        String?
+shippingPhone        String?
+shippingAddress      String?
+shippingCity         String?
+deliveryInstructions String?
+
+  invoice  Invoice?
+  payments Payment[]
+
+  customer Customer @relation(
     fields: [customerId],
     references: [id]
   )
 
-  organization   Organization @relation(
+  organization Organization @relation(
     fields: [organizationId],
     references: [id]
   )
 
-  items          OrderItem[]
-  createdAt      TimestamptzString @default(now())
-  updatedAt      temporal.updatedAtString()
+  items OrderItem[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
 }
+
 model Invoice {
   id             Int           @id @default(autoincrement())
   invoiceNumber  String
