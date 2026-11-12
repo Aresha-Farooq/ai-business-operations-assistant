@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getOrders } from "@business-platform/business/order-query";
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
     const order = await createOrder(validatedData);
 return NextResponse.json(order, { status: 201 });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         {
@@ -56,6 +60,9 @@ export async function GET() {
 
     return NextResponse.json(orders, { status: 200 });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     console.error("GET ORDERS TEST ERROR:", error);
     if (error instanceof Error) {
       if (error.message === "Not authenticated.") {

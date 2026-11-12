@@ -1,5 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 import {
   canTransitionOrderStatus,
   type OrderStatus,
@@ -13,7 +13,7 @@ type UpdateOrderStatusInput = {
 export async function updateOrderStatus(
   input: UpdateOrderStatusInput
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("orders:manage");
   const runtime = await getDbRuntime();
 
   // Find the order inside the user's organization

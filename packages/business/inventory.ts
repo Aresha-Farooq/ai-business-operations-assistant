@@ -5,7 +5,7 @@ import {
   createAuditLog,
 } from "@business-platform/database";
 
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 // --------------------------------------------------
 // Types
@@ -174,7 +174,7 @@ export async function applyStockMovement(
 export async function changeStock(
   input: ChangeStockInput
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("inventory:manage");
 
   const auditActions = {
     PURCHASE: "STOCK_PURCHASED",
@@ -213,7 +213,7 @@ export async function changeStock(
 // --------------------------------------------------
 
 export async function getInventoryMovements() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("inventory:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.inventoryMovement
@@ -240,7 +240,7 @@ export async function getInventoryMovements() {
 // --------------------------------------------------
 
 export async function getLowStockProducts() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("inventory:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.product
@@ -275,7 +275,7 @@ export async function getLowStockProducts() {
 export async function getProductStockHistory(
   productId: number
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("inventory:read");
   const runtime = await getDbRuntime();
 
   // Verify product belongs to current organization

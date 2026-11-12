@@ -1,53 +1,12 @@
 import { getCurrentUser } from "./session";
 
-export type UserRole = "OWNER" | "MANAGER" | "STAFF";
+import {
+  roleHasPermission,
+  type Permission,
+  type UserRole,
+} from "./permissions";
 
-export type Permission =
-  | "customers:read"
-  | "customers:manage"
-  | "orders:read"
-  | "orders:manage"
-  | "inventory:read"
-  | "inventory:manage"
-  | "sales:read"
-  | "employees:manage"
-  | "settings:manage"
-  | "invoices:read"
-  | "audit:read";
-
-const rolePermissions: Record<UserRole, Permission[]> = {
- OWNER: [
-  "customers:read",
-  "customers:manage",
-  "orders:read",
-  "orders:manage",
-  "inventory:read",
-  "inventory:manage",
-  "sales:read",
-  "employees:manage",
-  "settings:manage",
-  "invoices:read",
-  "audit:read",
-],
-
- MANAGER: [
-  "customers:read",
-  "customers:manage",
-  "orders:read",
-  "orders:manage",
-  "inventory:read",
-  "inventory:manage",
-  "sales:read",
-  "employees:manage",
-  "invoices:read",
-],
-
-  STAFF: [
-    "customers:read",
-    "orders:read",
-    "inventory:read",
-  ],
-};
+export type { Permission, UserRole } from "./permissions";
 
 export async function requireRole(
   allowedRoles: UserRole[]
@@ -74,9 +33,7 @@ export async function requirePermission(
     throw new Error("Not authenticated.");
   }
 
-  const role = user.role as UserRole;
-
-  if (!rolePermissions[role]?.includes(permission)) {
+  if (!roleHasPermission(user.role, permission)) {
     throw new Error("Forbidden.");
   }
 

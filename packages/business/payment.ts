@@ -1,5 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 import type {
   PaymentGateway,
   CreateGatewayPaymentInput,
@@ -14,7 +14,7 @@ export async function createPayment(
   input: CreatePaymentInput,
   paymentGateway: PaymentGateway
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("payments:manage");
   const runtime = await getDbRuntime();
 
   // 1. Find the order belonging to the current organization

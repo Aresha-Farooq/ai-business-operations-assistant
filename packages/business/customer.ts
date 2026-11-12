@@ -5,7 +5,7 @@ import {
   createAuditLog,
 } from "@business-platform/database";
 
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 type UpdateCustomerInput = {
   name?: string;
@@ -36,7 +36,7 @@ async function writeCustomerAudit(
 }
 
 export async function getCustomers() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.customer
@@ -65,7 +65,7 @@ export async function createCustomer(input: {
   email: string;
   phone?: string;
 }) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:manage");
 
   try {
     const runtime = await getDbRuntime();
@@ -118,7 +118,7 @@ export async function createCustomer(input: {
 }
 
 export async function getCustomerById(customerId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.customer
@@ -154,7 +154,7 @@ export async function updateCustomer(
   customerId: number,
   input: UpdateCustomerInput
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:manage");
 
   try {
     const updates = {
@@ -217,7 +217,7 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(customerId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:manage");
 
   try {
     const runtime = await getDbRuntime();

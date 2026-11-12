@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextRequest, NextResponse } from "next/server";
 
 import { verifyPayment } from "@business-platform/business/payment/verify-payment";
@@ -21,6 +22,9 @@ export async function POST(request: NextRequest) {
       status: 200,
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     console.error("Payment verification failed:", error);
 
     return NextResponse.json(

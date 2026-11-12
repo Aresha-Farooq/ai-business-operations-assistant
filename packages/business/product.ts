@@ -5,7 +5,7 @@ import {
   createAuditLog,
 } from "@business-platform/database";
 
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 async function writeProductAudit(
   organizationId: number,
@@ -32,7 +32,7 @@ async function writeProductAudit(
 }
 
 export async function getProducts() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("products:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.product
@@ -77,7 +77,7 @@ export async function createProduct(input: {
   imageUrl?: string;
   isPublished?: boolean;
 }) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("products:manage");
 
   try {
     const runtime = await getDbRuntime();
@@ -144,7 +144,7 @@ export async function createProduct(input: {
 }
 
 export async function getProductById(productId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("products:read");
   const runtime = await getDbRuntime();
 
   const plan = db.sql.public.product
@@ -200,7 +200,7 @@ export async function updateProduct(
     isPublished?: boolean;
   }
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("products:manage");
 
   try {
     const existingProduct = await getProductById(productId);
@@ -280,7 +280,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(productId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("products:manage");
 
   try {
     const runtime = await getDbRuntime();

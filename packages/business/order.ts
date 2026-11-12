@@ -1,6 +1,6 @@
 import { db, getDbRuntime } from "@business-platform/database";
 import { applyStockMovement } from "@business-platform/business/inventory";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 type CreateOrderItemInput = {
   productId: number;
@@ -14,7 +14,7 @@ type CreateOrderInput = {
 
 export async function createOrder(input: CreateOrderInput) {
   // 1. Get authenticated user
-  const user = await requireCurrentUser();
+  const user = await requirePermission("orders:manage");
 
   // 2. Get database runtime
   const runtime = await getDbRuntime();

@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
@@ -31,6 +32,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedOrder, { status: 200 });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         {

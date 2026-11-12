@@ -1,5 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 import {
   canTransitionShippingStatus,
   type ShippingStatus,
@@ -13,7 +13,7 @@ type UpdateShippingStatusInput = {
 export async function updateShippingStatus(
   input: UpdateShippingStatusInput
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("orders:manage");
   const runtime = await getDbRuntime();
 
   const orderPlan = db.sql.public.order

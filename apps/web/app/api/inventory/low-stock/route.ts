@@ -1,4 +1,5 @@
 
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 
 import {
@@ -14,6 +15,9 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (
       error instanceof Error &&
       error.message === "Not authenticated."

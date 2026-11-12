@@ -1,12 +1,12 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 export async function searchCustomers(searchTerm: string) {
   if (typeof searchTerm !== "string" || searchTerm.trim().length < 2) {
     throw new Error("Search term must contain at least 2 characters.");
   }
 
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:read");
   const runtime = await getDbRuntime();
   const term = `%${searchTerm.trim()}%`;
 

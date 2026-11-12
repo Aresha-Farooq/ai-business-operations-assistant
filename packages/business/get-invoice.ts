@@ -1,8 +1,8 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 export async function getInvoice(invoiceId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("invoices:read");
   const runtime = await getDbRuntime();
 
   const invoicePlan = db.sql.public.invoice
@@ -33,7 +33,7 @@ export async function getInvoice(invoiceId: number) {
 }
 
 export async function getInvoiceIds() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("invoices:read");
   const runtime = await getDbRuntime();
 
   const invoicePlan = db.sql.public.invoice
@@ -47,7 +47,7 @@ export async function getInvoiceIds() {
 }
 
 export async function checkInvoiceForOrder(orderId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("invoices:read");
   const runtime = await getDbRuntime();
 
   const invoicePlan = db.sql.public.invoice
@@ -63,7 +63,7 @@ export async function checkInvoiceForOrder(orderId: number) {
   return runtime.query(invoicePlan);
 }
 export async function createTestInvoice(orderId: number) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("orders:manage");
   const runtime = await getDbRuntime();
 
   // Find the order belonging to the authenticated organization.

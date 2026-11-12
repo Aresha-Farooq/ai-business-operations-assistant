@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 import { getCustomers , createCustomer} from "@business-platform/business/customer";
 import { createCustomerSchema } from "@business-platform/validation/customer";
@@ -11,6 +12,9 @@ export async function GET() {
       customers,
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (error instanceof Error && error.message === "Not authenticated.") {
       return NextResponse.json(
         { error: "Not authenticated." },
@@ -42,6 +46,9 @@ const customer = await createCustomer(validatedData);
       { status: 201 }
     );
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
  if (error instanceof ZodError) {
   return NextResponse.json(
     {

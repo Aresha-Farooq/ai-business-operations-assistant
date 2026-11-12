@@ -1,12 +1,8 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { getCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 export async function getInventoryMovements() {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
+  const user = await requirePermission("inventory:read");
 
   const runtime = await getDbRuntime();
 

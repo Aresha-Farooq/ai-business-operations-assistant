@@ -1,12 +1,12 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 import type { PaymentGateway } from "./gateway.js";
 
 export async function refundPayment(
   paymentId: number,
   paymentGateway: PaymentGateway
 ) {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("payments:manage");
   const runtime = await getDbRuntime();
 
   const paymentPlan = db.sql.public.payment

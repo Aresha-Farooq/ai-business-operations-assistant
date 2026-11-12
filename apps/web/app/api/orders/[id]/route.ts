@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 import { getOrderById } from "@business-platform/business/order-query";
 import {
@@ -25,6 +26,9 @@ export async function GET(
 
     return NextResponse.json(order, { status: 200 });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (error instanceof Error) {
       if (error.message === "Not authenticated.") {
         return NextResponse.json(
@@ -79,6 +83,9 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     if (error instanceof Error) {
       if (error.message === "Not authenticated.") {
         return NextResponse.json(

@@ -1,8 +1,8 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 export async function getOverdueInvoices() {
-  const user = await requireCurrentUser();
+  const user = await requirePermission("invoices:read");
   const runtime = await getDbRuntime();
   const now = new Date();
 

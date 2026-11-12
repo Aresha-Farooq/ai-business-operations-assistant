@@ -1,5 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 export type LowStockProduct = {
   id: number;
   name: string;
@@ -9,7 +9,7 @@ export type LowStockProduct = {
   organizationId: number;
 };
 export async function getLowStockProducts() {
-const user = await requireCurrentUser();
+const user = await requirePermission("inventory:read");
   const runtime = await getDbRuntime();
   const productsPlan = db.sql.public.product
     .select(

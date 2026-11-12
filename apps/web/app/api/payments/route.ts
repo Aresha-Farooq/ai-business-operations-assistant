@@ -1,3 +1,4 @@
+import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextRequest, NextResponse } from "next/server";
 import { createPayment } from "@business-platform/business/payment";
 import { createPaymentSchema } from "@business-platform/validation/payment";
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
       status: 201,
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+
     console.error("Payment creation failed:", error);
 
     return NextResponse.json(

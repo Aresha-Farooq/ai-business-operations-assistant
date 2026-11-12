@@ -1,5 +1,5 @@
 import { db, getDbRuntime } from "@business-platform/database";
-import { requireCurrentUser } from "@business-platform/auth/session";
+import { requirePermission } from "@business-platform/auth/authorization";
 
 export type CustomerDetails = {
   id: number;
@@ -15,7 +15,7 @@ export async function getCustomer(customerId: number) {
     throw new Error("Customer ID must be a positive safe integer.");
   }
 
-  const user = await requireCurrentUser();
+  const user = await requirePermission("customers:read");
   const runtime = await getDbRuntime();
 
   const customerPlan = db.sql.public.customer
