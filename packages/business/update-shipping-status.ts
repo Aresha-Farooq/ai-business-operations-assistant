@@ -1,7 +1,10 @@
-import { db, getDbRuntime } from "@business-platform/database";
+import { db, createAuditLog } from "@business-platform/database";
 import { requirePermission } from "@business-platform/auth/authorization";
 import {
-  canTransitionShippingStatus,
+  ORDER_CONFLICT_MESSAGE,
+  OrderLifecycleError,
+  getShippingTransitionError,
+  type OrderStatus,
   type ShippingStatus,
 } from "./order-status";
 
@@ -10,74 +13,96 @@ type UpdateShippingStatusInput = {
   shippingStatus: ShippingStatus;
 };
 
+// --------------------------------------------------
+// Change the shipping status of an order of the CURRENT organization.
+//
+// This only records delivery progress. It never changes the payment:
+// a COD payment is NOT marked as paid because an order was delivered.
+// --------------------------------------------------
 export async function updateShippingStatus(
   input: UpdateShippingStatusInput
 ) {
   const user = await requirePermission("orders:manage");
-  const runtime = await getDbRuntime();
 
-  const orderPlan = db.sql.public.order
-    .select(
-      "id",
-      "organizationId",
-      "status",
-      "shippingStatus",
-      "totalAmount"
-    )
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.id, input.orderId),
-        fns.eq(fields.organizationId, user.organizationId)
+  return db.transaction(async (tx) => {
+    const orderPlan = tx.sql.public.order
+      .select(
+        "id",
+        "organizationId",
+        "status",
+        "shippingStatus",
+        "totalAmount"
       )
-    )
-    .build();
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, input.orderId),
+          fns.eq(fields.organizationId, user.organizationId)
+        )
+      )
+      .build();
 
-  const orders = await runtime.query(orderPlan);
-  const order = orders[0];
+    const orders = await tx.query(orderPlan);
+    const order = orders[0];
 
-  if (!order) {
-    throw new Error("Order not found.");
-  }
+    if (!order) {
+      throw new OrderLifecycleError("NOT_FOUND", "Order not found.");
+    }
 
-  const currentShippingStatus =
-    order.shippingStatus as ShippingStatus;
+    const currentStatus = order.status as OrderStatus;
+    const currentShipping = order.shippingStatus as ShippingStatus;
 
-  if (
-    !canTransitionShippingStatus(
-      currentShippingStatus,
+    const transitionError = getShippingTransitionError(
+      { status: currentStatus, shippingStatus: currentShipping },
       input.shippingStatus
-    )
-  ) {
-    throw new Error(
-      `Cannot change shipping status from ${currentShippingStatus} to ${input.shippingStatus}.`
     );
-  }
 
-  const updatePlan = db.sql.public.order
-    .update({
-      shippingStatus: input.shippingStatus,
-    })
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.id, input.orderId),
-        fns.eq(fields.organizationId, user.organizationId)
+    if (transitionError) {
+      throw new OrderLifecycleError(
+        "INVALID_TRANSITION",
+        transitionError
+      );
+    }
+
+    // Compare-and-set on BOTH fields: the order must not have been
+    // cancelled or shipped by someone else in the meantime.
+    const updatePlan = tx.sql.public.order
+      .update({ shippingStatus: input.shippingStatus })
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, order.id),
+          fns.eq(fields.organizationId, user.organizationId),
+          fns.eq(fields.status, currentStatus),
+          fns.eq(fields.shippingStatus, currentShipping)
+        )
       )
-    )
-    .returning(
-      "id",
-      "organizationId",
-      "status",
-      "shippingStatus",
-      "totalAmount"
-    )
-    .build();
+      .returning(
+        "id",
+        "organizationId",
+        "status",
+        "shippingStatus",
+        "totalAmount"
+      )
+      .build();
 
-  const updatedOrders = await runtime.query(updatePlan);
-  const updatedOrder = updatedOrders[0];
+    const updatedOrders = await tx.query(updatePlan);
+    const updatedOrder = updatedOrders[0];
 
-  if (!updatedOrder) {
-    throw new Error("Failed to update shipping status.");
-  }
+    if (!updatedOrder) {
+      throw new OrderLifecycleError("CONFLICT", ORDER_CONFLICT_MESSAGE);
+    }
 
-  return updatedOrder;
+    await createAuditLog(
+      {
+        organizationId: user.organizationId,
+        userId: user.userId,
+        action: `ORDER_SHIPPING_CHANGED #${order.id} ${currentShipping}->${input.shippingStatus}`,
+        source: "BUSINESS_API",
+        status: "SUCCESS",
+        toolName: null,
+      },
+      tx
+    );
+
+    return updatedOrder;
+  });
 }

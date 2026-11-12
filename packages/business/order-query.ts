@@ -12,6 +12,8 @@ export async function getOrders() {
       "customerId",
       "organizationId",
       "status",
+      "shippingStatus",
+      "shippingCity",
       "totalAmount",
       "createdAt",
       "updatedAt"
@@ -93,6 +95,13 @@ export async function getOrderById(orderId: number) {
       "customerId",
       "organizationId",
       "status",
+      "shippingStatus",
+      "shippingName",
+      "shippingEmail",
+      "shippingPhone",
+      "shippingAddress",
+      "shippingCity",
+      "deliveryInstructions",
       "totalAmount",
       "createdAt",
       "updatedAt"
@@ -155,9 +164,22 @@ export async function getOrderById(orderId: number) {
       products.find((product) => product.id === item.productId) ?? null,
   }));
 
+  const paymentsPlan = db.sql.public.payment
+    .select("id", "amount", "currency", "method", "status", "createdAt")
+    .where((fields, fns) =>
+      fns.and(
+        fns.eq(fields.orderId, order.id),
+        fns.eq(fields.organizationId, user.organizationId)
+      )
+    )
+    .build();
+
+  const payments = await runtime.query(paymentsPlan);
+
   return {
     ...order,
     customer,
     items,
+    payments,
   };
 }

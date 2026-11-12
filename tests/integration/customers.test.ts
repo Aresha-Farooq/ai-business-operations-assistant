@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { GET, POST } from "../../apps/web/app/api/customers/route";
 
+// MANAGER: this suite creates customers (customers:manage). STAFF is
+// read-only and is covered by tests/unit/business-permission-guards.test.ts.
 vi.mock("@business-platform/auth/session", () => ({
   requireCurrentUser: vi.fn(async () => ({
     userId: 4,
     organizationId: 1,
-    role: "STAFF",
+    role: "MANAGER",
+  })),
+  getCurrentUser: vi.fn(async () => ({
+    userId: 4,
+    organizationId: 1,
+    role: "MANAGER",
   })),
 }));
 

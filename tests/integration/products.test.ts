@@ -11,6 +11,11 @@ vi.mock("@business-platform/auth/session", () => ({
     organizationId: 1,
     role: "STAFF",
   })),
+  getCurrentUser: vi.fn(async () => ({
+    userId: 4,
+    organizationId: 1,
+    role: "STAFF",
+  })),
 }));
 
 describe("GET /api/products", () => {

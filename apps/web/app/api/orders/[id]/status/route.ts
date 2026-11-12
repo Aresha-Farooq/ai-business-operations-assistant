@@ -1,7 +1,8 @@
-import { authErrorResponse } from "@/lib/api-auth-errors";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { authErrorResponse } from "@/lib/api-auth-errors";
+import { orderLifecycleErrorResponse } from "@/lib/order-lifecycle-errors";
 import { updateOrderStatus } from "@business-platform/business/update-order-status";
 import { orderStatusSchema } from "@business-platform/validation/order-status";
 
@@ -21,10 +22,23 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
 
-    const status = orderStatusSchema.parse(body.status);
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON request body." },
+        { status: 400 }
+      );
+    }
 
+    const status = orderStatusSchema.parse(
+      (body as { status?: unknown } | null)?.status
+    );
+
+    // organizationId is never read from the request: the business
+    // function derives it from the authenticated session.
     const updatedOrder = await updateOrderStatus({
       orderId,
       status,
@@ -34,6 +48,9 @@ export async function PATCH(
   } catch (error) {
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
+
+    const lifecycleResponse = orderLifecycleErrorResponse(error);
+    if (lifecycleResponse) return lifecycleResponse;
 
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -45,26 +62,7 @@ export async function PATCH(
       );
     }
 
-    if (error instanceof Error) {
-      if (error.message === "Not authenticated.") {
-        return NextResponse.json(
-          { error: "Not authenticated." },
-          { status: 401 }
-        );
-      }
-
-      if (error.message === "Order not found.") {
-        return NextResponse.json(
-          { error: "Order not found." },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
+    console.error("ORDER LIFECYCLE ERROR:", error);
 
     return NextResponse.json(
       { error: "Internal server error." },
