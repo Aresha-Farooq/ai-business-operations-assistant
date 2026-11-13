@@ -76,9 +76,7 @@ export async function applyStockMovement(
 
   if (input.type === "ADJUSTMENT") {
     if (!input.adjustmentDirection) {
-      throw new Error(
-        "Adjustment direction is required."
-      );
+      throw new Error("Adjustment direction is required.");
     }
 
     if (input.adjustmentDirection === "DECREASE") {
@@ -86,27 +84,37 @@ export async function applyStockMovement(
     }
   }
 
-  // Calculate new stock
+  // Extract callback types from the installed Prisma API
 
-  const newStockQuantity =
-    product.stockQuantity + stockChange;
+  type ProductUpdateCallback =
+    Parameters<typeof tx.sql.public.product.update>[0];
 
-  if (newStockQuantity < 0) {
-    throw new Error("Insufficient stock.");
-  }
+  type ProductUpdateFields =
+    Parameters<ProductUpdateCallback>[0];
 
-  // Update product stock
+  type ProductUpdateFunctions =
+    Parameters<ProductUpdateCallback>[1];
+
+  // Update stock atomically inside PostgreSQL
 
   const updateProductPlan = tx.sql.public.product
-    .update({
-      stockQuantity: newStockQuantity,
-    })
+    .update((
+      fields: ProductUpdateFields,
+      fns: ProductUpdateFunctions
+    ) => ({
+      stockQuantity: fns.raw`
+        ${fields.stockQuantity} + ${stockChange}
+      `.returns("pg/int4@1"),
+    }))
     .where((fields, fns) =>
       fns.and(
-        fns.eq(fields.id, product.id),
+        fns.eq(fields.id, input.productId),
         fns.eq(fields.organizationId, organizationId),
         fns.eq(fields.isActive, true),
-        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
+        fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
+        fns.raw`
+          ${fields.stockQuantity} + ${stockChange} >= 0
+        `.returns("pg/bool@1")
       )
     )
     .returning(
@@ -117,17 +125,16 @@ export async function applyStockMovement(
     )
     .build();
 
-  const updatedProducts = await tx.query(
-    updateProductPlan
-  );
-
+  const updatedProducts = await tx.query(updateProductPlan);
   const updatedProduct = updatedProducts[0];
 
   if (!updatedProduct) {
-    throw new Error("Failed to update product stock.");
+    throw new Error(
+      "Insufficient stock or product is unavailable."
+    );
   }
 
-  // Record inventory movement
+  // Record inventory movement in the same transaction
 
   const movementPlan = tx.sql.public.inventoryMovement
     .insert([
@@ -254,10 +261,7 @@ export async function getLowStockProducts() {
     )
     .where((fields, fns) =>
       fns.and(
-        fns.eq(
-          fields.organizationId,
-          user.organizationId
-        ),
+        fns.eq(fields.organizationId, user.organizationId),
         fns.eq(fields.isActive, true),
         fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
         fns.raw`${fields.stockQuantity} <= ${fields.minimumStock}`.returns("pg/bool@1")
@@ -285,10 +289,7 @@ export async function getProductStockHistory(
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.id, productId),
-        fns.eq(
-          fields.organizationId,
-          user.organizationId
-        ),
+        fns.eq(fields.organizationId, user.organizationId),
         fns.eq(fields.isActive, true),
         fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1")
       )
@@ -317,10 +318,7 @@ export async function getProductStockHistory(
     .where((fields, fns) =>
       fns.and(
         fns.eq(fields.productId, productId),
-        fns.eq(
-          fields.organizationId,
-          user.organizationId
-        )
+        fns.eq(fields.organizationId, user.organizationId)
       )
     )
     .build();

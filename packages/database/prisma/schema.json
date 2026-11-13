@@ -672,10 +672,12 @@
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -703,10 +705,12 @@
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -1168,10 +1172,12 @@
                 "nullable": false,
                 "on": {
                   "localFields": [
-                    "productId"
+                    "productId",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -1306,10 +1312,12 @@
                 "nullable": false,
                 "on": {
                   "localFields": [
-                    "orderId"
+                    "orderId",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -1581,10 +1589,12 @@
                 "nullable": false,
                 "on": {
                   "localFields": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -1597,10 +1607,12 @@
                 "nullable": true,
                 "on": {
                   "localFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "orderId"
+                    "orderId",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -1643,10 +1655,12 @@
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "orderId"
+                    "orderId",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -2143,10 +2157,12 @@
                 "nullable": false,
                 "on": {
                   "localFields": [
-                    "orderId"
+                    "orderId",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -2331,10 +2347,12 @@
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "productId"
+                    "productId",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -2505,10 +2523,12 @@
                 "nullable": false,
                 "on": {
                   "localFields": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ],
                   "targetFields": [
-                    "id"
+                    "id",
+                    "organizationId"
                   ]
                 },
                 "to": {
@@ -3139,7 +3159,15 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "id",
+                    "organizationId"
+                  ],
+                  "name": "customer_id_organization_id_unique"
+                }
+              ]
             },
             "document": {
               "checks": [
@@ -3487,16 +3515,19 @@
               },
               "foreignKeys": [
                 {
+                  "name": "inventory_movement_product_same_organization_fk",
                   "source": {
                     "columns": [
-                      "productId"
+                      "productId",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "inventoryMovement"
                   },
                   "target": {
                     "columns": [
-                      "id"
+                      "id",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "product"
@@ -3554,10 +3585,11 @@
                 },
                 {
                   "columns": [
-                    "productId"
+                    "productId",
+                    "organizationId"
                   ],
-                  "name": "inventoryMovement_productId_idx_5858600a",
-                  "prefix": "inventoryMovement_productId_idx",
+                  "name": "inventoryMovement_productId_organizationId_idx_0e3799f8",
+                  "prefix": "inventoryMovement_productId_organizationId_idx",
                   "unique": false
                 }
               ],
@@ -3677,16 +3709,19 @@
                   }
                 },
                 {
+                  "name": "invoice_order_same_organization_fk",
                   "source": {
                     "columns": [
-                      "orderId"
+                      "orderId",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "invoice"
                   },
                   "target": {
                     "columns": [
-                      "id"
+                      "id",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "order"
@@ -3729,6 +3764,13 @@
                     "organizationId",
                     "invoiceNumber"
                   ]
+                },
+                {
+                  "columns": [
+                    "orderId",
+                    "organizationId"
+                  ],
+                  "name": "invoice_order_organization_unique"
                 }
               ]
             },
@@ -3933,16 +3975,19 @@
               },
               "foreignKeys": [
                 {
+                  "name": "order_customer_same_organization_fk",
                   "source": {
                     "columns": [
-                      "customerId"
+                      "customerId",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "order"
                   },
                   "target": {
                     "columns": [
-                      "id"
+                      "id",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "customer"
@@ -3968,10 +4013,11 @@
               "indexes": [
                 {
                   "columns": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ],
-                  "name": "order_customerId_idx_b2a8a46c",
-                  "prefix": "order_customerId_idx",
+                  "name": "order_customerId_organizationId_idx_db8588fd",
+                  "prefix": "order_customerId_organizationId_idx",
                   "unique": false
                 },
                 {
@@ -3988,7 +4034,15 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "id",
+                    "organizationId"
+                  ],
+                  "name": "order_id_organization_id_unique"
+                }
+              ]
             },
             "orderItem": {
               "columns": {
@@ -4242,16 +4296,19 @@
               },
               "foreignKeys": [
                 {
+                  "name": "payment_order_same_organization_fk",
                   "source": {
                     "columns": [
-                      "orderId"
+                      "orderId",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "payment"
                   },
                   "target": {
                     "columns": [
-                      "id"
+                      "id",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "order"
@@ -4277,10 +4334,11 @@
               "indexes": [
                 {
                   "columns": [
-                    "orderId"
+                    "orderId",
+                    "organizationId"
                   ],
-                  "name": "payment_orderId_idx_d284871b",
-                  "prefix": "payment_orderId_idx",
+                  "name": "payment_orderId_organizationId_idx_3de541e1",
+                  "prefix": "payment_orderId_organizationId_idx",
                   "unique": false
                 },
                 {
@@ -4448,7 +4506,15 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "id",
+                    "organizationId"
+                  ],
+                  "name": "product_id_organization_id_unique"
+                }
+              ]
             },
             "ticket": {
               "checks": [
@@ -4561,16 +4627,19 @@
                   }
                 },
                 {
+                  "name": "ticket_customer_same_organization_fk",
                   "source": {
                     "columns": [
-                      "customerId"
+                      "customerId",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "ticket"
                   },
                   "target": {
                     "columns": [
-                      "id"
+                      "id",
+                      "organizationId"
                     ],
                     "namespaceId": "public",
                     "tableName": "customer"
@@ -4580,10 +4649,11 @@
               "indexes": [
                 {
                   "columns": [
-                    "customerId"
+                    "customerId",
+                    "organizationId"
                   ],
-                  "name": "ticket_customerId_idx_b2a8a46c",
-                  "prefix": "ticket_customerId_idx",
+                  "name": "ticket_customerId_organizationId_idx_db8588fd",
+                  "prefix": "ticket_customerId_organizationId_idx",
                   "unique": false
                 },
                 {
@@ -4848,7 +4918,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "c909d89c4fab829379d244aee8d70c4440cefa7ccf5084d020fc2f83b3b53f1f"
+    "storageHash": "8ace320af3cb93b334b64743796bd6c98307dfca19b5b674363be5decc350d8c"
   },
   "execution": {
     "executionHash": "8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274",

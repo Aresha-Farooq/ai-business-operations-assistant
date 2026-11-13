@@ -1,3 +1,4 @@
+
 import { db, createAuditLog } from "@business-platform/database";
 import { requirePermission } from "@business-platform/auth/authorization";
 import {
@@ -17,15 +18,9 @@ type OrderTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
 
-const MAX_RESTOCK_ATTEMPTS = 5;
-
 // --------------------------------------------------
-// Return the stock of every item of a cancelled order.
-//
-// Deliberately does NOT use applyStockMovement(): that function refuses
-// inactive / soft-deleted products, but a cancelled order must always get
-// its stock back. Uses a compare-and-set on stockQuantity so a concurrent
-// stock change can never be overwritten.
+// Restore stock for every item in a cancelled order.
+// Uses atomic database arithmetic.
 // --------------------------------------------------
 async function restockOrderItems(
   tx: OrderTransaction,
@@ -40,7 +35,7 @@ async function restockOrderItems(
 
   const items = await tx.query(itemsPlan);
 
-  // One restock per product, even if the order somehow lists it twice.
+  // Combine quantities if an order contains the same product more than once.
   const quantityByProduct = new Map<number, number>();
 
   for (const item of items) {
@@ -50,53 +45,45 @@ async function restockOrderItems(
     );
   }
 
+  type ProductUpdateCallback =
+    Parameters<typeof tx.sql.public.product.update>[0];
+
+  type ProductUpdateFields =
+    Parameters<ProductUpdateCallback>[0];
+
+  type ProductUpdateFunctions =
+    Parameters<ProductUpdateCallback>[1];
+
   for (const [productId, quantity] of quantityByProduct) {
-    let restocked = false;
-
-    for (let attempt = 0; attempt < MAX_RESTOCK_ATTEMPTS; attempt++) {
-      const productPlan = tx.sql.public.product
-        .select("id", "stockQuantity")
-        .where((fields, fns) =>
-          fns.and(
-            fns.eq(fields.id, productId),
-            fns.eq(fields.organizationId, organizationId)
-          )
+    // Increment stock directly in PostgreSQL.
+    // No previously fetched stock value is used.
+    const updatePlan = tx.sql.public.product
+      .update((
+        fields: ProductUpdateFields,
+        fns: ProductUpdateFunctions
+      ) => ({
+        stockQuantity: fns.raw`
+          ${fields.stockQuantity} + ${quantity}
+        `.returns("pg/int4@1"),
+      }))
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, productId),
+          fns.eq(fields.organizationId, organizationId)
         )
-        .build();
+      )
+      .returning("id", "stockQuantity")
+      .build();
 
-      const products = await tx.query(productPlan);
-      const product = products[0];
+    const updatedProducts = await tx.query(updatePlan);
 
-      if (!product) {
-        throw new Error(
-          `Cannot restock: product ${productId} was not found in this organization.`
-        );
-      }
-
-      const updatePlan = tx.sql.public.product
-        .update({ stockQuantity: product.stockQuantity + quantity })
-        .where((fields, fns) =>
-          fns.and(
-            fns.eq(fields.id, productId),
-            fns.eq(fields.organizationId, organizationId),
-            fns.eq(fields.stockQuantity, product.stockQuantity)
-          )
-        )
-        .returning("id")
-        .build();
-
-      const updated = await tx.query(updatePlan);
-
-      if (updated[0]) {
-        restocked = true;
-        break;
-      }
+    if (!updatedProducts[0]) {
+      throw new Error(
+        `Cannot restock: product ${productId} was not found in this organization.`
+      );
     }
 
-    if (!restocked) {
-      throw new OrderLifecycleError("CONFLICT", ORDER_CONFLICT_MESSAGE);
-    }
-
+    // Record the restock in the same transaction.
     const movementPlan = tx.sql.public.inventoryMovement
       .insert([
         {
@@ -128,7 +115,7 @@ export async function updateOrderStatus(
   const user = await requirePermission("orders:manage");
 
   return db.transaction(async (tx) => {
-    // 1. Load the order, scoped to the user's organization
+    // 1. Load the order, scoped to the user's organization.
     const orderPlan = tx.sql.public.order
       .select(
         "id",
@@ -155,7 +142,7 @@ export async function updateOrderStatus(
     const currentStatus = order.status as OrderStatus;
     const currentShipping = order.shippingStatus as ShippingStatus;
 
-    // 2. Does the order have a payment that was already collected?
+    // 2. Check whether the order has already been paid.
     const paymentsPlan = tx.sql.public.payment
       .select("id", "status")
       .where((fields, fns) =>
@@ -172,7 +159,7 @@ export async function updateOrderStatus(
       (payment) => payment.status === "PAID"
     );
 
-    // 3. Validate the transition on the server
+    // 3. Validate the transition on the server.
     const transitionError = getOrderTransitionError(
       {
         status: currentStatus,
@@ -189,9 +176,8 @@ export async function updateOrderStatus(
       );
     }
 
-    // 4. Compare-and-set: only update if nobody changed the order since
-    //    we read it. Two simultaneous cancels can never both succeed, so
-    //    stock is restored at most once.
+    // 4. Compare-and-set: only one concurrent status transition succeeds.
+    // This prevents two cancellation requests from restoring stock twice.
     const updatePlan = tx.sql.public.order
       .update({ status: input.status })
       .where((fields, fns) =>
@@ -218,7 +204,7 @@ export async function updateOrderStatus(
       throw new OrderLifecycleError("CONFLICT", ORDER_CONFLICT_MESSAGE);
     }
 
-    // 5. Side effects of cancellation, in the same transaction
+    // 5. Cancellation side effects stay inside the same transaction.
     if (input.status === "CANCELLED") {
       await restockOrderItems(
         tx,
@@ -227,8 +213,8 @@ export async function updateOrderStatus(
         user.userId
       );
 
-      // Nothing will be collected for a cancelled order. There is no
-      // CANCELLED payment status, so FAILED is used (PAID is blocked above).
+      // Pending payments are marked FAILED.
+      // Paid orders are blocked by the transition validation above.
       const voidPaymentsPlan = tx.sql.public.payment
         .update({ status: "FAILED" })
         .where((fields, fns) =>
@@ -244,7 +230,7 @@ export async function updateOrderStatus(
       await tx.query(voidPaymentsPlan);
     }
 
-    // 6. Audit trail
+    // 6. Audit trail.
     await createAuditLog(
       {
         organizationId: user.organizationId,

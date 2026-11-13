@@ -1,3 +1,4 @@
+
 enum UserRole {
   OWNER
   MANAGER
@@ -23,11 +24,13 @@ enum DocumentApprovalStatus {
   APPROVED
   REJECTED
 }
+
 enum AuditStatus {
   SUCCESS
   FAILURE
   DENIED
 }
+
 enum AuditSource {
   BUSINESS_API
   MCP
@@ -38,20 +41,22 @@ enum AuditSource {
 model Organization {
   id        Int      @id @default(autoincrement())
   name      String
-slug String? @unique
-conversations Conversation[]
-invoices Invoice[]
+  slug      String?  @unique
+
+  conversations      Conversation[]
+  invoices           Invoice[]
+  tickets            Ticket[]
+  auditLogs          AuditLog[]
+  documents          Document[]
+  inventoryMovements InventoryMovement[]
+  users              User[]
+  customers          Customer[]
+  products           Product[]
+  payments           Payment[]
+  documentChunks     DocumentChunk[]
+
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
-  tickets Ticket[]
-  auditLogs AuditLog[]
-documents Document[]
-  inventoryMovements InventoryMovement[]
-  users             User[]
-  customers         Customer[]
-  products          Product[]
-  payments          Payment[]
-  documentChunks DocumentChunk[]
 }
 
 model User {
@@ -62,8 +67,8 @@ model User {
   organizationId Int
   role           UserRole @default(STAFF)
 
-  isActive       Boolean  @default(true)
-  deletedAt      TimestamptzString?
+  isActive  Boolean           @default(true)
+  deletedAt TimestamptzString?
 
   auditLogs          AuditLog[]
   conversations      Conversation[]
@@ -79,23 +84,26 @@ model User {
 }
 
 model Customer {
-  id             Int                @id @default(autoincrement())
+  id             Int     @id @default(autoincrement())
   name           String
   email          String
   phone          String?
   organizationId Int
-  isActive       Boolean            @default(true)
+  isActive       Boolean @default(true)
   deletedAt      TimestamptzString?
+
   tickets Ticket[]
+  orders  Order[]
 
   organization Organization @relation(
     fields: [organizationId],
     references: [id]
   )
 
-  orders Order[]
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
+
+  @@unique([id, organizationId], map: "customer_id_organization_id_unique")
 }
 
 model Ticket {
@@ -107,8 +115,9 @@ model Ticket {
   priority       TicketPriority @default(MEDIUM)
   status         TicketStatus   @default(OPEN)
   assigneeId     Int?
-  createdAt      TimestamptzString @default(now())
-  updatedAt      temporal.updatedAtString()
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
 
   organization Organization @relation(
     fields: [organizationId],
@@ -116,52 +125,75 @@ model Ticket {
   )
 
   customer Customer @relation(
-    fields: [customerId],
-    references: [id]
+    fields: [customerId, organizationId],
+    references: [id, organizationId],
+    map: "ticket_customer_same_organization_fk"
   )
 }
 
 model Product {
-  id             Int      @id @default(autoincrement())
+  id             Int     @id @default(autoincrement())
   name           String
   description    String?
   sku            String
 
-  purchasePrice  Float
-  salePrice      Float
-  stockQuantity  Int      @default(0)
-  minimumStock   Int      @default(0)
+  purchasePrice Float
+  salePrice     Float
+  stockQuantity Int     @default(0)
+  minimumStock  Int     @default(0)
 
   organizationId Int
-imageUrl     String?
-category     String?
-isPublished  Boolean @default(false)
-  isActive       Boolean  @default(true)
+  imageUrl       String?
+  category       String?
+  isPublished    Boolean @default(false)
+  isActive       Boolean @default(true)
   deletedAt      TimestamptzString?
-inventoryMovements InventoryMovement[]
-  organization Organization @relation(fields: [organizationId], references: [id])
-@@index(
-  [organizationId, sku],
-  where: "(\"deletedAt\" IS NULL)",
-  unique: true,
-  map: "product_org_sku_unique"
-)
-  createdAt      TimestamptzString @default(now())
-  updatedAt      temporal.updatedAtString()
+
+  inventoryMovements InventoryMovement[]
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@unique([id, organizationId], map: "product_id_organization_id_unique")
+
+  @@index(
+    [organizationId, sku],
+    where: "(\"deletedAt\" IS NULL)",
+    unique: true,
+    map: "product_org_sku_unique"
+  )
 }
 
 model InventoryMovement {
-  id             Int      @id @default(autoincrement())
+  id             Int                    @id @default(autoincrement())
   productId      Int
   organizationId Int
   quantity       Int
   type           InventoryMovementType
   reason         String?
 
-  product      Product      @relation(fields: [productId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-createdBy Int?
-createdByUser User? @relation(fields: [createdBy], references: [id])
+  product Product @relation(
+    fields: [productId, organizationId],
+    references: [id, organizationId],
+    map: "inventory_movement_product_same_organization_fk"
+  )
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
+  createdBy     Int?
+  createdByUser User? @relation(
+    fields: [createdBy],
+    references: [id]
+  )
+
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
@@ -173,7 +205,6 @@ enum InventoryMovementType {
   RETURN
   DAMAGE
 }
-
 
 enum OrderStatus {
   PENDING
@@ -188,6 +219,7 @@ enum ShippingStatus {
   SHIPPED
   DELIVERED
 }
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -209,9 +241,8 @@ enum InvoiceStatus {
   VOID
 }
 
-
 model Order {
-  id             Int         @id @default(autoincrement())
+  id             Int @id @default(autoincrement())
   customerId     Int
   organizationId Int
 
@@ -219,19 +250,20 @@ model Order {
   shippingStatus ShippingStatus @default(NOT_SHIPPED)
   totalAmount    Float
 
-shippingName         String?
-shippingEmail        String?
-shippingPhone        String?
-shippingAddress      String?
-shippingCity         String?
-deliveryInstructions String?
+  shippingName         String?
+  shippingEmail        String?
+  shippingPhone        String?
+  shippingAddress      String?
+  shippingCity         String?
+  deliveryInstructions String?
 
   invoice  Invoice?
   payments Payment[]
 
   customer Customer @relation(
-    fields: [customerId],
-    references: [id]
+    fields: [customerId, organizationId],
+    references: [id, organizationId],
+    map: "order_customer_same_organization_fk"
   )
 
   organization Organization @relation(
@@ -243,6 +275,8 @@ deliveryInstructions String?
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
+
+  @@unique([id, organizationId], map: "order_id_organization_id_unique")
 }
 
 model Invoice {
@@ -262,31 +296,31 @@ model Invoice {
   )
 
   order Order @relation(
-    fields: [orderId],
-    references: [id]
+    fields: [orderId, organizationId],
+    references: [id, organizationId],
+    map: "invoice_order_same_organization_fk"
   )
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
-
+@@unique([orderId, organizationId], map: "invoice_order_organization_unique")
   @@unique([organizationId, invoiceNumber])
-
   @@index([organizationId, status, dueDate])
 }
 
 model OrderItem {
-  id        Int     @id @default(autoincrement())
+  id        Int   @id @default(autoincrement())
   orderId   Int
   productId Int
   quantity  Int
   unitPrice Float
 
-  order     Order   @relation(
+  order Order @relation(
     fields: [orderId],
     references: [id]
   )
 
-  product   Product @relation(
+  product Product @relation(
     fields: [productId],
     references: [id]
   )
@@ -307,8 +341,9 @@ model Payment {
   gatewayTransactionId String?
 
   order Order @relation(
-    fields: [orderId],
-    references: [id]
+    fields: [orderId, organizationId],
+    references: [id, organizationId],
+    map: "payment_order_same_organization_fk"
   )
 
   organization Organization @relation(
@@ -320,14 +355,12 @@ model Payment {
   updatedAt temporal.updatedAtString()
 }
 
-
 enum DocumentStatus {
   UPLOADED
   PROCESSING
   PROCESSED
   FAILED
 }
-
 
 model Document {
   id             Int            @id @default(autoincrement())
@@ -339,16 +372,18 @@ model Document {
   status         DocumentStatus @default(UPLOADED)
   approvalStatus DocumentApprovalStatus @default(PENDING)
 
-  
-  uploadedBy     Int?
-  createdAt      TimestamptzString @default(now())
-  updatedAt      temporal.updatedAtString()
+  uploadedBy Int?
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  organization Organization @relation(
+    fields: [organizationId],
+    references: [id]
+  )
+
   chunks DocumentChunk[]
 }
-
-
 
 model DocumentChunk {
   id             Int      @id @default(autoincrement())
@@ -360,7 +395,8 @@ model DocumentChunk {
   source         String
   processedAt    TimestamptzString @default(now())
   createdAt      TimestamptzString @default(now())
-  embeddingJson String?
+  embeddingJson  String?
+
   document Document @relation(
     fields: [documentId],
     references: [id],
@@ -378,10 +414,10 @@ model DocumentChunk {
 }
 
 model Conversation {
-  id             Int      @id @default(autoincrement())
+  id             Int    @id @default(autoincrement())
   organizationId Int
   userId         Int
-  title          String   @default("New conversation")
+  title          String @default("New conversation")
 
   organization Organization @relation(
     fields: [organizationId],
@@ -404,7 +440,7 @@ model Conversation {
 }
 
 model Message {
-  id             Int      @id @default(autoincrement())
+  id             Int    @id @default(autoincrement())
   conversationId Int
   role           String
   content        String
@@ -421,18 +457,18 @@ model Message {
   @@index([conversationId, createdAt])
 }
 
-
 model AuditLog {
   id             Int         @id @default(autoincrement())
   organizationId Int
   userId         Int?
 
-  action         String
-  source AuditSource @default(SYSTEM)
-  toolName       String?
-  status         AuditStatus
+  action   String
+  source   AuditSource @default(SYSTEM)
+  toolName String?
+  status   AuditStatus
 
-  errorMessage   String?
+  errorMessage String?
+
   organization Organization @relation(
     fields: [organizationId],
     references: [id],

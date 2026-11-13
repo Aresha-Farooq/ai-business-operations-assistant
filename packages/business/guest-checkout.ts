@@ -195,47 +195,49 @@ export async function createGuestCheckoutOrder(
       throw new Error("Failed to create order.");
     }
 
-    // 9. Update stock and record inventory movements
+    // 9. Update stock atomically and record inventory movements
+
+    type ProductUpdateCallback =
+      Parameters<typeof tx.sql.public.product.update>[0];
+
+    type ProductUpdateFields =
+      Parameters<ProductUpdateCallback>[0];
+
+    type ProductUpdateFunctions =
+      Parameters<ProductUpdateCallback>[1];
+
     for (const item of orderItems) {
-      const product = products.find(
-        (product) => product.id === item.productId
-      );
-
-      if (!product) {
-        throw new Error("Product not found.");
-      }
-
-      const newStockQuantity =
-        product.stockQuantity - item.quantity;
-
       const updateProductPlan = tx.sql.public.product
-        .update({
-          stockQuantity: newStockQuantity,
-        })
+        .update((
+          fields: ProductUpdateFields,
+          fns: ProductUpdateFunctions
+        ) => ({
+          stockQuantity: fns.raw`
+            ${fields.stockQuantity} - ${item.quantity}
+          `.returns("pg/int4@1"),
+        }))
         .where((fields, fns) =>
-         fns.and(
-  fns.eq(fields.id, item.productId),
-  fns.eq(fields.organizationId, organizationId),
-  fns.eq(fields.isActive, true),
-  fns.eq(fields.isPublished, true),
-  fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
-  fns.eq(fields.stockQuantity, product.stockQuantity),
-  fns.raw`${fields.stockQuantity} >= ${item.quantity}`.returns("pg/bool@1")
-)
+          fns.and(
+            fns.eq(fields.id, item.productId),
+            fns.eq(fields.organizationId, organizationId),
+            fns.eq(fields.isActive, true),
+            fns.eq(fields.isPublished, true),
+            fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
+            fns.raw`${fields.stockQuantity} >= ${item.quantity}`.returns("pg/bool@1")
+          )
         )
         .returning("id", "stockQuantity")
         .build();
 
-      const updatedProducts = await tx.query(
-        updateProductPlan
-      );
+      const updatedProducts = await tx.query(updateProductPlan);
 
       if (!updatedProducts[0]) {
         throw new Error(
-          `Stock update failed for "${item.productName}". Please try again.`
+          `Stock update failed for "${item.productName}". Insufficient stock or product unavailable.`
         );
       }
 
+      // Record movement in the same transaction
       const movementPlan = tx.sql.public.inventoryMovement
         .insert([
           {
@@ -279,6 +281,10 @@ export async function createGuestCheckoutOrder(
     const createdOrderItems = await tx.query(
       orderItemPlan
     );
+
+    if (createdOrderItems.length !== orderItems.length) {
+      throw new Error("Failed to create all order items.");
+    }
 
     // 11. Create COD payment
     const paymentPlan = tx.sql.public.payment

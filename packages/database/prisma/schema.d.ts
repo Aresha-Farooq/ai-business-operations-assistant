@@ -34,7 +34,7 @@ import type {
 } from '@internal/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'c909d89c4fab829379d244aee8d70c4440cefa7ccf5084d020fc2f83b3b53f1f'>;
+  StorageHashBase<'8ace320af3cb93b334b64743796bd6c98307dfca19b5b674363be5decc350d8c'>;
 export type ExecutionHash =
   ExecutionHashBase<'8c65fbfca8a5f5db2103ebdd68799793ee176e986675af3da96297bd20cb8274'>;
 export type ProfileHash =
@@ -1507,7 +1507,12 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [
+                {
+                  readonly columns: readonly ['id', 'organizationId'];
+                  readonly name: 'customer_id_organization_id_unique';
+                },
+              ];
               indexes: readonly [
                 {
                   readonly name: 'customer_organizationId_idx_2e17ef41';
@@ -1792,9 +1797,9 @@ type ContractBase = Omit<
               uniques: readonly [];
               indexes: readonly [
                 {
-                  readonly name: 'inventoryMovement_productId_idx_5858600a';
-                  readonly prefix: 'inventoryMovement_productId_idx';
-                  readonly columns: readonly ['productId'];
+                  readonly name: 'inventoryMovement_productId_organizationId_idx_0e3799f8';
+                  readonly prefix: 'inventoryMovement_productId_organizationId_idx';
+                  readonly columns: readonly ['productId', 'organizationId'];
                   readonly unique: false;
                 },
                 {
@@ -1815,13 +1820,14 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'inventoryMovement';
-                    readonly columns: readonly ['productId'];
+                    readonly columns: readonly ['productId', 'organizationId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'product';
-                    readonly columns: readonly ['id'];
+                    readonly columns: readonly ['id', 'organizationId'];
                   };
+                  readonly name: 'inventory_movement_product_same_organization_fk';
                 },
                 {
                   readonly source: {
@@ -1924,6 +1930,10 @@ type ContractBase = Omit<
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [
                 { readonly columns: readonly ['orderId'] },
+                {
+                  readonly columns: readonly ['orderId', 'organizationId'];
+                  readonly name: 'invoice_order_organization_unique';
+                },
                 { readonly columns: readonly ['organizationId', 'invoiceNumber'] },
               ];
               indexes: readonly [
@@ -1957,13 +1967,14 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'invoice';
-                    readonly columns: readonly ['orderId'];
+                    readonly columns: readonly ['orderId', 'organizationId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'order';
-                    readonly columns: readonly ['id'];
+                    readonly columns: readonly ['id', 'organizationId'];
                   };
+                  readonly name: 'invoice_order_same_organization_fk';
                 },
               ];
             };
@@ -2123,12 +2134,17 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [
+                {
+                  readonly columns: readonly ['id', 'organizationId'];
+                  readonly name: 'order_id_organization_id_unique';
+                },
+              ];
               indexes: readonly [
                 {
-                  readonly name: 'order_customerId_idx_b2a8a46c';
-                  readonly prefix: 'order_customerId_idx';
-                  readonly columns: readonly ['customerId'];
+                  readonly name: 'order_customerId_organizationId_idx_db8588fd';
+                  readonly prefix: 'order_customerId_organizationId_idx';
+                  readonly columns: readonly ['customerId', 'organizationId'];
                   readonly unique: false;
                 },
                 {
@@ -2143,13 +2159,14 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'order';
-                    readonly columns: readonly ['customerId'];
+                    readonly columns: readonly ['customerId', 'organizationId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'customer';
-                    readonly columns: readonly ['id'];
+                    readonly columns: readonly ['id', 'organizationId'];
                   };
+                  readonly name: 'order_customer_same_organization_fk';
                 },
                 {
                   readonly source: {
@@ -2360,9 +2377,9 @@ type ContractBase = Omit<
               uniques: readonly [];
               indexes: readonly [
                 {
-                  readonly name: 'payment_orderId_idx_d284871b';
-                  readonly prefix: 'payment_orderId_idx';
-                  readonly columns: readonly ['orderId'];
+                  readonly name: 'payment_orderId_organizationId_idx_3de541e1';
+                  readonly prefix: 'payment_orderId_organizationId_idx';
+                  readonly columns: readonly ['orderId', 'organizationId'];
                   readonly unique: false;
                 },
                 {
@@ -2377,13 +2394,14 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'payment';
-                    readonly columns: readonly ['orderId'];
+                    readonly columns: readonly ['orderId', 'organizationId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'order';
-                    readonly columns: readonly ['id'];
+                    readonly columns: readonly ['id', 'organizationId'];
                   };
+                  readonly name: 'payment_order_same_organization_fk';
                 },
                 {
                   readonly source: {
@@ -2504,7 +2522,12 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [
+                {
+                  readonly columns: readonly ['id', 'organizationId'];
+                  readonly name: 'product_id_organization_id_unique';
+                },
+              ];
               indexes: readonly [
                 {
                   readonly name: 'product_org_sku_unique';
@@ -2610,9 +2633,9 @@ type ContractBase = Omit<
                   readonly unique: false;
                 },
                 {
-                  readonly name: 'ticket_customerId_idx_b2a8a46c';
-                  readonly prefix: 'ticket_customerId_idx';
-                  readonly columns: readonly ['customerId'];
+                  readonly name: 'ticket_customerId_organizationId_idx_db8588fd';
+                  readonly prefix: 'ticket_customerId_organizationId_idx';
+                  readonly columns: readonly ['customerId', 'organizationId'];
                   readonly unique: false;
                 },
               ];
@@ -2633,13 +2656,14 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'ticket';
-                    readonly columns: readonly ['customerId'];
+                    readonly columns: readonly ['customerId', 'organizationId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'customer';
-                    readonly columns: readonly ['id'];
+                    readonly columns: readonly ['id', 'organizationId'];
                   };
+                  readonly name: 'ticket_customer_same_organization_fk';
                 },
               ];
             };
@@ -3054,8 +3078,8 @@ type ContractBase = Omit<
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['customerId'];
+                  readonly localFields: readonly ['id', 'organizationId'];
+                  readonly targetFields: readonly ['customerId', 'organizationId'];
                 };
               };
               readonly organization: {
@@ -3077,8 +3101,8 @@ type ContractBase = Omit<
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['customerId'];
+                  readonly localFields: readonly ['id', 'organizationId'];
+                  readonly targetFields: readonly ['customerId', 'organizationId'];
                 };
               };
             };
@@ -3361,8 +3385,8 @@ type ContractBase = Omit<
                 readonly cardinality: 'N:1';
                 readonly nullable: false;
                 readonly on: {
-                  readonly localFields: readonly ['productId'];
-                  readonly targetFields: readonly ['id'];
+                  readonly localFields: readonly ['productId', 'organizationId'];
+                  readonly targetFields: readonly ['id', 'organizationId'];
                 };
               };
             };
@@ -3450,8 +3474,8 @@ type ContractBase = Omit<
                 readonly cardinality: 'N:1';
                 readonly nullable: false;
                 readonly on: {
-                  readonly localFields: readonly ['orderId'];
-                  readonly targetFields: readonly ['id'];
+                  readonly localFields: readonly ['orderId', 'organizationId'];
+                  readonly targetFields: readonly ['id', 'organizationId'];
                 };
               };
               readonly organization: {
@@ -3616,8 +3640,8 @@ type ContractBase = Omit<
                 readonly cardinality: 'N:1';
                 readonly nullable: false;
                 readonly on: {
-                  readonly localFields: readonly ['customerId'];
-                  readonly targetFields: readonly ['id'];
+                  readonly localFields: readonly ['customerId', 'organizationId'];
+                  readonly targetFields: readonly ['id', 'organizationId'];
                 };
               };
               readonly invoice: {
@@ -3628,8 +3652,8 @@ type ContractBase = Omit<
                 readonly cardinality: '1:1';
                 readonly nullable: true;
                 readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['orderId'];
+                  readonly localFields: readonly ['id', 'organizationId'];
+                  readonly targetFields: readonly ['orderId', 'organizationId'];
                 };
               };
               readonly items: {
@@ -3662,8 +3686,8 @@ type ContractBase = Omit<
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['orderId'];
+                  readonly localFields: readonly ['id', 'organizationId'];
+                  readonly targetFields: readonly ['orderId', 'organizationId'];
                 };
               };
             };
@@ -3988,8 +4012,8 @@ type ContractBase = Omit<
                 readonly cardinality: 'N:1';
                 readonly nullable: false;
                 readonly on: {
-                  readonly localFields: readonly ['orderId'];
-                  readonly targetFields: readonly ['id'];
+                  readonly localFields: readonly ['orderId', 'organizationId'];
+                  readonly targetFields: readonly ['id', 'organizationId'];
                 };
               };
               readonly organization: {
@@ -4107,8 +4131,8 @@ type ContractBase = Omit<
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
-                  readonly localFields: readonly ['id'];
-                  readonly targetFields: readonly ['productId'];
+                  readonly localFields: readonly ['id', 'organizationId'];
+                  readonly targetFields: readonly ['productId', 'organizationId'];
                 };
               };
               readonly organization: {
@@ -4205,8 +4229,8 @@ type ContractBase = Omit<
                 readonly cardinality: 'N:1';
                 readonly nullable: false;
                 readonly on: {
-                  readonly localFields: readonly ['customerId'];
-                  readonly targetFields: readonly ['id'];
+                  readonly localFields: readonly ['customerId', 'organizationId'];
+                  readonly targetFields: readonly ['id', 'organizationId'];
                 };
               };
               readonly organization: {
