@@ -1,196 +1,242 @@
-import { db, getDbRuntime } from "@business-platform/database";
+
+import { db, getDbRuntime, createAuditLog } from "@business-platform/database";
 import { requirePermission } from "@business-platform/auth/authorization";
+import { MockPaymentGateway } from "./payment/mock-gateway.js";
 import type {
   PaymentGateway,
   CreateGatewayPaymentInput,
 } from "./payment/gateway.js";
+import {
+  PaymentError,
+  getCreatePaymentDecision,
+} from "./payment/payment-rules.js";
 
 type CreatePaymentInput = {
   orderId: number;
   method: "COD" | "CARD" | "JAZZCASH" | "EASYPAISA";
 };
 
+const orderLocks = new Map<number, Promise<void>>();
+
+async function withOrderLock<T>(
+  orderId: number,
+  task: () => Promise<T>
+): Promise<T> {
+  const previous = orderLocks.get(orderId) ?? Promise.resolve();
+
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  orderLocks.set(orderId, current);
+  await previous;
+
+  try {
+    return await task();
+  } finally {
+    release();
+    if (orderLocks.get(orderId) === current) {
+      orderLocks.delete(orderId);
+    }
+  }
+}
+
+const paymentFields = [
+  "id",
+  "orderId",
+  "organizationId",
+  "amount",
+  "currency",
+  "method",
+  "status",
+  "gateway",
+  "gatewayTransactionId",
+  "createdAt",
+  "updatedAt",
+] as const;
+
 export async function createPayment(
   input: CreatePaymentInput,
-  paymentGateway: PaymentGateway
+  paymentGateway: PaymentGateway = new MockPaymentGateway()
 ) {
   const user = await requirePermission("payments:manage");
-  const runtime = await getDbRuntime();
 
-  // 1. Find the order belonging to the current organization
-  const orderPlan = db.sql.public.order
-    .select(
-      "id",
-      "customerId",
-      "organizationId",
-      "status",
-      "totalAmount"
-    )
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.id, input.orderId),
-        fns.eq(fields.organizationId, user.organizationId)
-      )
-    )
-    .build();
+  return withOrderLock(input.orderId, async () => {
+    const runtime = await getDbRuntime();
 
-  const orders = await runtime.query(orderPlan);
-  const order = orders[0];
-
-  if (!order) {
-    throw new Error("Order not found.");
-  }
-
-  // 2. Prevent payments for invalid order states
-  if (order.status === "CANCELLED") {
-    throw new Error(
-      "Cannot create a payment for a cancelled order."
-    );
-  }
-
-  if (order.status === "COMPLETED") {
-    throw new Error(
-      "Cannot create a payment for a completed order."
-    );
-  }
-
-  // 3. Get the trusted payment amount from the database
-  const paymentAmount = order.totalAmount;
-
-  if (paymentAmount <= 0) {
-    throw new Error("Order total must be greater than zero.");
-  }
-
-  // 4. Check whether the order already has an active payment
-  const existingPaymentPlan = db.sql.public.payment
-    .select(
-      "id",
-      "status",
-      "amount",
-      "method"
-    )
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.orderId, order.id),
-        fns.eq(fields.organizationId, user.organizationId)
-      )
-    )
-    .build();
-
-  const existingPayments =
-    await runtime.query(existingPaymentPlan);
-
-  const activePayment = existingPayments.find(
-    (payment) =>
-      payment.status === "PENDING" ||
-      payment.status === "PAID"
-  );
-
-  if (activePayment) {
-    throw new Error(
-      "This order already has an active payment."
-    );
-  }
-
-  // 5. Create our internal Payment record
-  const paymentPlan = db.sql.public.payment
-    .insert([
-      {
-        orderId: order.id,
-        organizationId: user.organizationId,
-        amount: paymentAmount,
-        currency: "PKR",
-        method: input.method,
-        status: "PENDING",
-        gateway: null,
-        gatewayTransactionId: null,
-      },
-    ])
-    .returning(
-      "id",
-      "orderId",
-      "organizationId",
-      "amount",
-      "currency",
-      "method",
-      "status",
-      "gateway",
-      "gatewayTransactionId",
-      "createdAt",
-      "updatedAt"
-    )
-    .build();
-
-  const payments = await runtime.query(paymentPlan);
-  const payment = payments[0];
-
-  if (!payment) {
-    throw new Error("Failed to create payment.");
-  }
-  
-if (input.method === "COD") {
-  return {
-    payment,
-    gateway: null,
-  };
-}
-  // 6. Prepare the information required by the gateway
-  const gatewayInput: CreateGatewayPaymentInput = {
-    paymentId: payment.id,
-    amount: payment.amount,
-    currency: payment.currency,
-    orderId: payment.orderId,
-  };
-
-  // 7. Ask the gateway to create the external payment
-  const gatewayResult =
-    await paymentGateway.createPayment(gatewayInput);
-
-  // 8. Save the gateway transaction information
-  const updatePaymentPlan = db.sql.public.payment
-    .update({
-      gatewayTransactionId:
-        gatewayResult.transactionId ?? null,
-      gateway: "MOCK",
-    })
-    .where((fields, fns) =>
-      fns.and(
-        fns.eq(fields.id, payment.id),
-        fns.eq(
-          fields.organizationId,
-          user.organizationId
+    const orderPlan = db.sql.public.order
+      .select("id", "status", "totalAmount")
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, input.orderId),
+          fns.eq(fields.organizationId, user.organizationId)
         )
       )
-    )
-    .returning(
-      "id",
-      "orderId",
-      "organizationId",
-      "amount",
-      "currency",
-      "method",
-      "status",
-      "gateway",
-      "gatewayTransactionId",
-      "createdAt",
-      "updatedAt"
-    )
-    .build();
+      .build();
 
-  const updatedPayments =
-    await runtime.query(updatePaymentPlan);
+    const orders = await runtime.query(orderPlan);
+    const order = orders[0];
 
-  const updatedPayment = updatedPayments[0];
+    if (!order) {
+      throw new PaymentError("NOT_FOUND", "Order not found.");
+    }
 
-  if (!updatedPayment) {
-    throw new Error(
-      "Failed to update payment with gateway information."
+    if (!Number.isFinite(order.totalAmount) || order.totalAmount <= 0) {
+      throw new PaymentError(
+        "INVALID_AMOUNT",
+        "Order total must be greater than zero."
+      );
+    }
+
+    const existingPlan = db.sql.public.payment
+      .select("id", "status", "method")
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.orderId, order.id),
+          fns.eq(fields.organizationId, user.organizationId)
+        )
+      )
+      .build();
+
+    const existingPayments = await runtime.query(existingPlan);
+
+    const decision = getCreatePaymentDecision(
+      order,
+      existingPayments,
+      input.method
     );
-  }
 
-  // 9. Return both our payment and the gateway information
-  return {
-    payment: updatedPayment,
-    gateway: gatewayResult,
-  };
+    if (decision.action === "reuse") {
+      const existingPaymentPlan = db.sql.public.payment
+        .select(...paymentFields)
+        .where((fields, fns) =>
+          fns.and(
+            fns.eq(fields.id, decision.paymentId),
+            fns.eq(fields.organizationId, user.organizationId)
+          )
+        )
+        .build();
+
+      const existingPayment = (
+        await runtime.query(existingPaymentPlan)
+      )[0];
+
+      if (!existingPayment) {
+        throw new PaymentError("NOT_FOUND", "Payment not found.");
+      }
+
+      return {
+        payment: existingPayment,
+        gateway: null,
+        idempotentReplay: true,
+      };
+    }
+
+    const paymentPlan = db.sql.public.payment
+      .insert([
+        {
+          orderId: order.id,
+          organizationId: user.organizationId,
+          amount: order.totalAmount,
+          currency: "PKR",
+          method: input.method,
+          status: "PENDING",
+          gateway: input.method === "COD" ? null : "MOCK",
+          gatewayTransactionId: null,
+        },
+      ])
+      .returning(...paymentFields)
+      .build();
+
+    const payment = (await runtime.query(paymentPlan))[0];
+
+    if (!payment) {
+      throw new Error("Failed to create payment.");
+    }
+
+    await createAuditLog({
+      organizationId: user.organizationId,
+      action: `PAYMENT_CREATED #${payment.id}`,
+      source: "BUSINESS_API",
+      status: "SUCCESS",
+    });
+
+    if (input.method === "COD") {
+      return {
+        payment,
+        gateway: null,
+        idempotentReplay: false,
+      };
+    }
+
+    const gatewayInput: CreateGatewayPaymentInput = {
+      paymentId: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      orderId: payment.orderId,
+    };
+
+    let gatewayResult;
+
+    try {
+      gatewayResult = await paymentGateway.createPayment(gatewayInput);
+    } catch (error) {
+      const failedPlan = db.sql.public.payment
+        .update({ status: "FAILED" })
+        .where((fields, fns) =>
+          fns.and(
+            fns.eq(fields.id, payment.id),
+            fns.eq(fields.organizationId, user.organizationId),
+            fns.eq(fields.status, "PENDING")
+          )
+        )
+        .build();
+
+      await runtime.query(failedPlan);
+
+      try {
+        await createAuditLog({
+          organizationId: user.organizationId,
+          action: `PAYMENT_CREATE_FAILED #${payment.id}`,
+          source: "BUSINESS_API",
+          status: "FAILURE",
+          errorMessage: "Payment gateway creation failed.",
+        });
+      } catch {
+        // Preserve the original gateway error.
+      }
+
+      throw new PaymentError(
+        "GATEWAY_ERROR",
+        error instanceof Error ? error.message : "Payment gateway failed."
+      );
+    }
+
+    const updatePlan = db.sql.public.payment
+      .update({
+        gatewayTransactionId: gatewayResult.transactionId ?? null,
+        gateway: "MOCK",
+      })
+      .where((fields, fns) =>
+        fns.and(
+          fns.eq(fields.id, payment.id),
+          fns.eq(fields.organizationId, user.organizationId)
+        )
+      )
+      .returning(...paymentFields)
+      .build();
+
+    const updatedPayment = (await runtime.query(updatePlan))[0];
+
+    if (!updatedPayment) {
+      throw new Error("Failed to save gateway payment information.");
+    }
+
+    return {
+      payment: updatedPayment,
+      gateway: gatewayResult,
+      idempotentReplay: false,
+    };
+  });
 }

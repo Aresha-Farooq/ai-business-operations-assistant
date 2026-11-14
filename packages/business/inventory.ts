@@ -38,6 +38,17 @@ export async function applyStockMovement(
   organizationId: number,
   userId: number
 ) {
+    if (!Number.isSafeInteger(input.quantity) || input.quantity <= 0) {
+    throw new Error("Quantity must be a positive integer.");
+  }
+
+  if (
+    input.type === "ADJUSTMENT"
+      ? !["INCREASE", "DECREASE"].includes(input.adjustmentDirection ?? "")
+      : input.adjustmentDirection !== undefined
+  ) {
+    throw new Error("Invalid adjustment direction.");
+  }
   const productPlan = tx.sql.public.product
     .select(
       "id",

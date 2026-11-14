@@ -9,65 +9,16 @@ export default class M extends Migration<Start, End> {
   override readonly startContractJson = startContract;
   override readonly endContractJson = endContract;
 
-  override get operations() {
+    override get operations() {
     return [
-      this.addColumn({
+      this.dropIndex({
         schema: 'public',
-        table: 'order',
-        column: col('deliveryInstructions', 'text', { codecRef: { codecId: 'pg/text@1' } }),
+        table: 'payment',
+        index: 'payment_orderid_organizationid_idx_3de541e1',
       }),
-      this.addColumn({
-        schema: 'public',
-        table: 'order',
-        column: col('shippingAddress', 'text', { codecRef: { codecId: 'pg/text@1' } }),
-      }),
-      this.dataTransform(endContract, 'backfill-order-shippingAddress', {
-        check: () => placeholder('backfill-order-shippingAddress:check'),
-        run: () => placeholder('backfill-order-shippingAddress:run'),
-      }),
-      this.setNotNull({ schema: 'public', table: 'order', column: 'shippingAddress' }),
-      this.addColumn({
-        schema: 'public',
-        table: 'order',
-        column: col('shippingCity', 'text', { codecRef: { codecId: 'pg/text@1' } }),
-      }),
-      this.dataTransform(endContract, 'backfill-order-shippingCity', {
-        check: () => placeholder('backfill-order-shippingCity:check'),
-        run: () => placeholder('backfill-order-shippingCity:run'),
-      }),
-      this.setNotNull({ schema: 'public', table: 'order', column: 'shippingCity' }),
-      this.addColumn({
-        schema: 'public',
-        table: 'order',
-        column: col('shippingEmail', 'text', { codecRef: { codecId: 'pg/text@1' } }),
-      }),
-      this.dataTransform(endContract, 'backfill-order-shippingEmail', {
-        check: () => placeholder('backfill-order-shippingEmail:check'),
-        run: () => placeholder('backfill-order-shippingEmail:run'),
-      }),
-      this.setNotNull({ schema: 'public', table: 'order', column: 'shippingEmail' }),
-      this.addColumn({
-        schema: 'public',
-        table: 'order',
-        column: col('shippingName', 'text', { codecRef: { codecId: 'pg/text@1' } }),
-      }),
-      this.dataTransform(endContract, 'backfill-order-shippingName', {
-        check: () => placeholder('backfill-order-shippingName:check'),
-        run: () => placeholder('backfill-order-shippingName:run'),
-      }),
-      this.setNotNull({ schema: 'public', table: 'order', column: 'shippingName' }),
-      this.addColumn({
-        schema: 'public',
-        table: 'order',
-        column: col('shippingPhone', 'text', { codecRef: { codecId: 'pg/text@1' } }),
-      }),
-      this.dataTransform(endContract, 'backfill-order-shippingPhone', {
-        check: () => placeholder('backfill-order-shippingPhone:check'),
-        run: () => placeholder('backfill-order-shippingPhone:run'),
-      }),
-      this.setNotNull({ schema: 'public', table: 'order', column: 'shippingPhone' }),
     ];
   }
+
 }
 
 MigrationCLI.run(import.meta.url, M);

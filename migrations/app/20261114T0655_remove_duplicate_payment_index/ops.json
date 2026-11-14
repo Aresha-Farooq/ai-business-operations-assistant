@@ -1,0 +1,41 @@
+[
+  {
+    "id": "dropIndex.payment.payment_orderid_organizationid_idx_3de541e1",
+    "label": "Drop index \"payment_orderid_organizationid_idx_3de541e1\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "payment_orderid_organizationid_idx_3de541e1",
+        "table": "payment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"payment_orderid_organizationid_idx_3de541e1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"payment_orderid_organizationid_idx_3de541e1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop index \"payment_orderid_organizationid_idx_3de541e1\"",
+        "sql": "DROP INDEX \"public\".\"payment_orderid_organizationid_idx_3de541e1\"",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"payment_orderid_organizationid_idx_3de541e1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"payment_orderid_organizationid_idx_3de541e1\""
+        ]
+      }
+    ]
+  }
+]

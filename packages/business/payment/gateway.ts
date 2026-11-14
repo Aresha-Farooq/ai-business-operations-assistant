@@ -1,3 +1,4 @@
+
 export type PaymentGatewayStatus =
   | "PENDING"
   | "PAID"
@@ -17,6 +18,13 @@ export type GatewayPaymentResult = {
   paymentUrl?: string;
 };
 
+export type VerifiedGatewayPaymentResult = {
+  status: PaymentGatewayStatus;
+  transactionId: string;
+  amount: number;
+  currency: string;
+};
+
 export interface PaymentGateway {
   createPayment(
     input: CreateGatewayPaymentInput
@@ -24,7 +32,7 @@ export interface PaymentGateway {
 
   verifyPayment(
     transactionId: string
-  ): Promise<GatewayPaymentResult>;
+  ): Promise<VerifiedGatewayPaymentResult>;
 
   refundPayment(
     transactionId: string,

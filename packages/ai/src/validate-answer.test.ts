@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { generateContentMock } = vi.hoisted(() => ({
@@ -6,11 +5,11 @@ const { generateContentMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@google/genai", () => ({
-  GoogleGenAI: vi.fn().mockImplementation(() => ({
-    models: {
+  GoogleGenAI: class {
+    models = {
       generateContent: generateContentMock,
-    },
-  })),
+    };
+  },
 }));
 
 import { validateAnswer } from "./validate-answer.js";
@@ -29,7 +28,7 @@ describe("validateAnswer", () => {
     const result = await validateAnswer(
       "How many annual leaves?",
       ["Employees receive 20 annual leaves."],
-      "Employees receive 20 annual leaves.",
+      "Employees receive 20 annual leaves."
     );
 
     expect(result.isGrounded).toBe(true);
@@ -43,7 +42,7 @@ describe("validateAnswer", () => {
     const result = await validateAnswer(
       "How many annual leaves?",
       ["Employees receive 20 annual leaves."],
-      "Employees receive 30 annual leaves.",
+      "Employees receive 30 annual leaves."
     );
 
     expect(result.isGrounded).toBe(false);
@@ -58,8 +57,8 @@ describe("validateAnswer", () => {
       validateAnswer(
         "How many annual leaves?",
         ["Employees receive 20 annual leaves."],
-        "Employees receive 20 annual leaves.",
-      ),
+        "Employees receive 20 annual leaves."
+      )
     ).rejects.toThrow("invalid JSON");
   });
 });

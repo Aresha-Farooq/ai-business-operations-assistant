@@ -195,8 +195,10 @@ export async function createGuestCheckoutOrder(
       throw new Error("Failed to create order.");
     }
 
-    // 9. Update stock atomically and record inventory movements
+    // Generate a stable customer-facing reference
+    const orderReference = `ORD-${String(order.id).padStart(6, "0")}`;
 
+    // 9. Update stock atomically and record inventory movements
     type ProductUpdateCallback =
       Parameters<typeof tx.sql.public.product.update>[0];
 
@@ -223,7 +225,9 @@ export async function createGuestCheckoutOrder(
             fns.eq(fields.isActive, true),
             fns.eq(fields.isPublished, true),
             fns.raw`${fields.deletedAt} IS NULL`.returns("pg/bool@1"),
-            fns.raw`${fields.stockQuantity} >= ${item.quantity}`.returns("pg/bool@1")
+            fns.raw`
+              ${fields.stockQuantity} >= ${item.quantity}
+            `.returns("pg/bool@1")
           )
         )
         .returning("id", "stockQuantity")
@@ -246,7 +250,7 @@ export async function createGuestCheckoutOrder(
             createdBy: null,
             quantity: -item.quantity,
             type: "SALE",
-            reason: `Guest checkout order #${order.id}`,
+            reason: `Guest checkout ${orderReference}`,
           },
         ])
         .returning("id", "productId", "quantity", "type")
@@ -320,7 +324,10 @@ export async function createGuestCheckoutOrder(
 
     // 12. Return order confirmation data
     return {
-      order,
+      order: {
+        ...order,
+        orderReference,
+      },
       items: createdOrderItems,
       payment,
     };
